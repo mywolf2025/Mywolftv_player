@@ -59,10 +59,7 @@ input, select, textarea {
   display: grid;
   place-items: center;
   padding: 24px;
-  background:
-    radial-gradient(ellipse at 20% 10%, rgba(124, 92, 255, 0.22), transparent 50%),
-    radial-gradient(ellipse at 85% 90%, rgba(34, 211, 238, 0.18), transparent 55%),
-    var(--bg-0);
+  background: var(--bg-0);
   min-height: 100vh;
 }
 
@@ -72,12 +69,10 @@ input, select, textarea {
 }
 
 .login-card {
-  background: rgba(20, 26, 51, 0.7);
+  background: var(--bg-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 36px 32px;
-  backdrop-filter: blur(20px);
-  box-shadow: var(--shadow);
 }
 
 .brand {

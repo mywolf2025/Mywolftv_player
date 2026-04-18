@@ -4,19 +4,36 @@
   grid-template-columns: 260px 1fr;
   height: 100vh;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse at top left, rgba(124, 92, 255, 0.12), transparent 50%),
-    radial-gradient(ellipse at bottom right, rgba(34, 211, 238, 0.1), transparent 50%),
-    var(--bg-0);
+  background: var(--bg-0);
+}
+
+/* ===== TV focus ring ===== */
+:focus { outline: none; }
+[tabindex]:focus, button:focus, .nav-item:focus, .category-item:focus,
+.item-card:focus, .tab:focus, .icon-btn:focus, .saved-item-info:focus,
+.item-fav:focus, input:focus, a:focus {
+  outline: 3px solid var(--primary-2);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.25);
+  z-index: 5;
+  position: relative;
+}
+.item-card:focus {
+  transform: scale(1.04);
+  border-color: var(--primary-2);
+  z-index: 10;
+}
+.nav-item:focus, .category-item:focus {
+  background: var(--grad-soft);
+  color: var(--text);
 }
 
 /* ===== Sidebar ===== */
 .sidebar {
   display: flex;
   flex-direction: column;
-  background: rgba(13, 17, 36, 0.85);
+  background: var(--bg-1);
   border-right: 1px solid var(--border);
-  backdrop-filter: blur(10px);
   overflow: hidden;
 }
 
@@ -134,8 +151,7 @@
   justify-content: space-between;
   padding: 18px 26px;
   border-bottom: 1px solid var(--border);
-  background: rgba(13, 17, 36, 0.5);
-  backdrop-filter: blur(10px);
+  background: var(--bg-1);
 }
 
 .topbar-title {
@@ -185,10 +201,22 @@
 
 .categories {
   border-right: 1px solid var(--border);
-  background: rgba(13, 17, 36, 0.4);
+  background: var(--bg-1);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.load-more-btn {
+  display: block;
+  margin: 16px auto 24px;
+  padding: 12px 28px;
+  background: var(--grad);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
 }
 
 .category-header {
@@ -277,14 +305,12 @@
   border-radius: var(--radius);
   overflow: hidden;
   cursor: pointer;
-  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  transition: transform 0.12s ease-out, border-color 0.12s ease-out;
   position: relative;
 }
 
 .item-card:hover {
-  transform: translateY(-3px);
   border-color: var(--primary);
-  box-shadow: 0 10px 24px rgba(124, 92, 255, 0.2);
 }
 
 .item-poster {
@@ -376,12 +402,11 @@
 .player-modal {
   position: fixed;
   inset: 0;
-  background: rgba(7, 9, 18, 0.96);
+  background: #000;
   z-index: 100;
   display: grid;
   place-items: center;
   padding: 24px;
-  backdrop-filter: blur(8px);
 }
 
 .player-modal[hidden] { display: none; }

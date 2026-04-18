@@ -227,9 +227,11 @@
     });
   }
 
+  const PAGE_SIZE = 60;
+
   function renderItems(view, items) {
     clearLoading();
-    itemsGrid.className = 'items-grid' + (view === 'live' ? '' : '');
+    itemsGrid.className = 'items-grid';
 
     const filter = state.filter.toLowerCase();
     const filtered = filter
@@ -245,27 +247,41 @@
       return;
     }
 
+    state.renderCtx = { view, filtered, offset: 0 };
+    itemsGrid.innerHTML = '';
+    appendPage();
+  }
+
+  function appendPage() {
+    const ctx = state.renderCtx;
+    if (!ctx) return;
+    const { view, filtered } = ctx;
+    const start = ctx.offset;
+    const end = Math.min(start + PAGE_SIZE, filtered.length);
+    if (start >= filtered.length) return;
+
     const favs = MWStorage.getFavorites(active.id);
     const kind = view;
     const favIds = new Set((favs[kind] || []).map(String));
 
     const frag = document.createDocumentFragment();
-    filtered.slice(0, 500).forEach(it => {
+    for (let i = start; i < end; i++) {
+      const it = filtered[i];
       const id = String(it.stream_id || it.series_id || it.id);
       const name = it.name || it.title || 'Unknown';
       const logo = it.stream_icon || it.cover || it.logo || '';
       const isChannel = view === 'live';
       const card = document.createElement('div');
       card.className = 'item-card' + (isChannel ? ' channel' : '');
+      card.setAttribute('tabindex', '0');
       const fav = favIds.has(id) ? 'active' : '';
-      const extra = (!isChannel && it.rating) ? `<div class="item-meta">★ ${escapeHtml(it.rating)}</div>` : '';
-      const fallbackBg = isChannel ? 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 9"><rect fill="%23141a33" width="16" height="9"/></svg>') : '';
+      const extra = (!isChannel && it.rating) ? `<div class="item-meta">${escapeHtml(it.rating)}</div>` : '';
       const posterHtml = logo
         ? `<img class="item-poster" src="${escapeHtml(logo)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />`
         : `<div class="item-poster" style="display:grid;place-items:center;color:#5f6690;font-size:11px;">No Image</div>`;
       card.innerHTML = `
         ${posterHtml}
-        <button class="item-fav ${fav}" data-fav title="Favorite">
+        <button class="item-fav ${fav}" data-fav title="Favorite" tabindex="-1">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
         </button>
         <div class="item-body">
@@ -277,13 +293,27 @@
         const added = MWStorage.toggleFavorite(active.id, kind, id);
         e.currentTarget.classList.toggle('active', added);
       });
-      card.addEventListener('click', () => {
-        openItem(view, it);
-      });
+      card.addEventListener('click', () => openItem(view, it));
       frag.appendChild(card);
-    });
-    itemsGrid.innerHTML = '';
+    }
     itemsGrid.appendChild(frag);
+    ctx.offset = end;
+
+    // Remove any existing "load more" button
+    const existingMore = itemsGrid.parentElement.querySelector('.load-more-btn');
+    if (existingMore) existingMore.remove();
+
+    if (end < filtered.length) {
+      const btn = document.createElement('button');
+      btn.className = 'load-more-btn';
+      btn.setAttribute('tabindex', '0');
+      btn.textContent = `Show more (${filtered.length - end} remaining)`;
+      btn.addEventListener('click', () => {
+        btn.remove();
+        appendPage();
+      });
+      itemsGrid.parentElement.appendChild(btn);
+    }
   }
 
   // ========== Playback ==========

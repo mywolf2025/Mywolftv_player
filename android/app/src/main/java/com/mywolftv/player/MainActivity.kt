@@ -15,6 +15,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
 
     @SuppressLint("SetJavaScriptEnabled")
+    @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setTheme(R.style.Theme_MyWolfTV)
@@ -39,8 +40,10 @@ class MainActivity : AppCompatActivity() {
             useWideViewPort = true
             mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
+            setRenderPriority(android.webkit.WebSettings.RenderPriority.HIGH)
             userAgentString = "$userAgentString MyWolfTVPlayer/1.0"
         }
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
         webView.webViewClient = WebViewClient()
         webView.webChromeClient = object : WebChromeClient() {
