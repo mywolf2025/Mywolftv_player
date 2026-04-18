@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="wolfG" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c5cff"/>
+      <stop offset="100%" stop-color="#22d3ee"/>
+    </linearGradient>
+    <radialGradient id="bgG" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#1a1f3a"/>
+      <stop offset="100%" stop-color="#0a0d1f"/>
+    </radialGradient>
+  </defs>
+  <circle cx="64" cy="64" r="62" fill="url(#bgG)" stroke="url(#wolfG)" stroke-width="3"/>
+  <g transform="translate(64 64)">
+    <path fill="url(#wolfG)" d="
+      M -34 -18
+      L -22 -30
+      L -14 -14
+      L 0 -22
+      L 14 -14
+      L 22 -30
+      L 34 -18
+      L 30 6
+      L 22 18
+      L 14 28
+      L -14 28
+      L -22 18
+      L -30 6
+      Z"/>
+    <circle cx="-12" cy="-2" r="3.5" fill="#0a0d1f"/>
+    <circle cx="12" cy="-2" r="3.5" fill="#0a0d1f"/>
+    <circle cx="-12" cy="-2" r="1.2" fill="#22d3ee"/>
+    <circle cx="12" cy="-2" r="1.2" fill="#22d3ee"/>
+    <path fill="#0a0d1f" d="M -6 10 L 0 16 L 6 10 L 3 10 L 0 13 L -3 10 Z"/>
+    <path fill="#0a0d1f" d="M -2 16 L 0 22 L 2 16 Z"/>
+  </g>
+</svg>
