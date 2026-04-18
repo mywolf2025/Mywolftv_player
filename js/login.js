@@ -108,6 +108,39 @@
     }
   });
 
+  // Pair Code form
+  const pairForm = document.getElementById('pair-form');
+  if (pairForm) {
+    pairForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const btn = form.querySelector('button[type=submit]');
+      const code = form.code.value.trim();
+      if (!code) return;
+      setLoading(btn, true);
+      try {
+        const cfg = await MWPair.fetch(code);
+        if (!cfg || !cfg.type) throw new Error('Invalid pair payload');
+        const playlist = { ...cfg, id: uid(), createdAt: Date.now() };
+        if (playlist.type === 'xtream') {
+          const client = new XtreamClient(playlist);
+          const info = await client.auth();
+          playlist.host = client.host;
+          playlist.userInfo = info.user_info || null;
+          playlist.serverInfo = info.server_info || null;
+        }
+        MWStorage.savePlaylist(playlist);
+        MWStorage.setActive(playlist);
+        showToast('Paired successfully', 'success');
+        setTimeout(() => { window.location.href = 'player.html'; }, 500);
+      } catch (err) {
+        showToast('Pair failed: ' + err.message, 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+  }
+
   // Saved playlists
   function renderSaved() {
     const container = document.getElementById('saved-playlists');

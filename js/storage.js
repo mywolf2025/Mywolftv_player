@@ -5,6 +5,8 @@
   const ACTIVE_KEY = 'mywolftv.active';
   const FAVS_KEY = 'mywolftv.favorites';
   const SETTINGS_KEY = 'mywolftv.settings';
+  const HISTORY_KEY = 'mywolftv.history';
+  const HISTORY_LIMIT = 30;
 
   function read(key, fallback) {
     try {
@@ -71,6 +73,39 @@
     },
     saveSettings(settings) {
       write(SETTINGS_KEY, settings);
+    },
+    getHistory(playlistId) {
+      const all = read(HISTORY_KEY, {});
+      return all[playlistId] || { live: [], movies: [], series: [] };
+    },
+    addHistory(playlistId, kind, entry) {
+      const all = read(HISTORY_KEY, {});
+      const current = all[playlistId] || { live: [], movies: [], series: [] };
+      const arr = current[kind] || [];
+      const idx = arr.findIndex(e => String(e.id) === String(entry.id));
+      if (idx >= 0) arr.splice(idx, 1);
+      arr.unshift({ ...entry, ts: Date.now() });
+      if (arr.length > HISTORY_LIMIT) arr.length = HISTORY_LIMIT;
+      current[kind] = arr;
+      all[playlistId] = current;
+      write(HISTORY_KEY, all);
+    },
+    clearHistory(playlistId, kind) {
+      const all = read(HISTORY_KEY, {});
+      if (!all[playlistId]) return;
+      if (kind) all[playlistId][kind] = [];
+      else all[playlistId] = { live: [], movies: [], series: [] };
+      write(HISTORY_KEY, all);
+    },
+    clearFavorites(playlistId, kind) {
+      const all = read(FAVS_KEY, {});
+      if (!all[playlistId]) return;
+      if (kind) all[playlistId][kind] = [];
+      else all[playlistId] = { live: [], movies: [], series: [] };
+      write(FAVS_KEY, all);
+    },
+    clearAll() {
+      [PLAYLISTS_KEY, ACTIVE_KEY, FAVS_KEY, SETTINGS_KEY, HISTORY_KEY].forEach(k => localStorage.removeItem(k));
     },
   };
 

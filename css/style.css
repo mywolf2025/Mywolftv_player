@@ -269,6 +269,25 @@ input, select, textarea {
   color: var(--text-mute);
 }
 
+.pair-hint {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+
+.pair-hint strong {
+  display: block;
+  color: var(--text);
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.pair-hint a { word-break: break-all; }
+
 /* ===== Toast ===== */
 .toast {
   position: fixed;

@@ -19,8 +19,9 @@
       </div>
 
       <div class="tabs">
-        <button class="tab active" data-tab="xtream">Xtream Login</button>
-        <button class="tab" data-tab="m3u">M3U Playlist</button>
+        <button class="tab active" data-tab="xtream">Xtream</button>
+        <button class="tab" data-tab="m3u">M3U</button>
+        <button class="tab" data-tab="pair">Pair Code</button>
       </div>
 
       <form id="xtream-form" class="login-form active" autocomplete="off">
@@ -65,6 +66,20 @@
         </button>
       </form>
 
+      <form id="pair-form" class="login-form" autocomplete="off">
+        <div class="pair-hint">
+          <strong>Easy setup — no typing on TV</strong>
+          <p>On your phone, open <a href="https://mywolf2025.github.io/Mywolftv_player/setup.html" target="_blank" rel="noopener">mywolf2025.github.io/Mywolftv_player/setup.html</a>, enter your Xtream details, then type the short code shown below.</p>
+        </div>
+        <label>
+          <span>Pair Code</span>
+          <input type="text" name="code" placeholder="e.g. 7aB" required maxlength="12" autocapitalize="off" autocorrect="off" />
+        </label>
+        <button type="submit" class="btn-primary">
+          <span>Pair &amp; Load</span>
+        </button>
+      </form>
+
       <div id="saved-playlists" class="saved-playlists"></div>
 
       <div class="login-footer">
@@ -77,6 +92,7 @@
 
   <script src="js/storage.js"></script>
   <script src="js/xtream.js"></script>
+  <script src="js/pair.js"></script>
   <script src="js/login.js"></script>
   <script src="js/tv-nav.js"></script>
 </body>

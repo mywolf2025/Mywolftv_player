@@ -85,7 +85,7 @@
     document.querySelectorAll('.nav-item').forEach(n => {
       n.classList.toggle('active', n.getAttribute('data-view') === view);
     });
-    const titles = { live: 'Live TV', movies: 'Movies', series: 'Series', favorites: 'Favorites', search: 'Search', settings: 'Settings' };
+    const titles = { live: 'Live TV', movies: 'Movies', series: 'Series', favorites: 'Favorites', recent: 'Recently Played', search: 'Search', settings: 'Settings' };
     viewTitle.textContent = titles[view] || view;
 
     if (view === 'settings') {
@@ -98,6 +98,10 @@
     }
     if (view === 'favorites') {
       renderFavorites();
+      return;
+    }
+    if (view === 'recent') {
+      renderRecent();
       return;
     }
     loadView(view);
@@ -354,6 +358,11 @@
     playerProgram.textContent = '';
     if (logo) { playerLogo.src = logo; playerLogo.style.display = ''; } else { playerLogo.style.display = 'none'; }
 
+    try {
+      const histId = String(item.stream_id || item.series_id || item.id);
+      MWStorage.addHistory(active.id, view, { id: histId, name: title, logo });
+    } catch (e) {}
+
     const kind = view;
     const id = String(item.stream_id || item.series_id || item.id);
     const isFav = MWStorage.isFavorite(active.id, kind, id);
@@ -591,10 +600,13 @@
     const s = active.serverInfo || {};
     const expiry = u.exp_date ? new Date(Number(u.exp_date) * 1000).toLocaleDateString() : '—';
     const settings = MWStorage.getSettings();
+    const hist = MWStorage.getHistory(active.id);
+    const favs = MWStorage.getFavorites(active.id);
+    const playlists = MWStorage.getPlaylists();
 
     wrap.innerHTML = `
       <div class="settings-section">
-        <h3>Playlist</h3>
+        <h3>Playlist Info</h3>
         <div class="info-row"><span class="label">Name</span><span class="value">${escapeHtml(active.name)}</span></div>
         <div class="info-row"><span class="label">Type</span><span class="value">${active.type === 'xtream' ? 'Xtream Codes' : 'M3U URL'}</span></div>
         <div class="info-row"><span class="label">${active.type === 'xtream' ? 'Host' : 'URL'}</span><span class="value">${escapeHtml(active.type === 'xtream' ? active.host : active.url)}</span></div>
@@ -602,7 +614,7 @@
           <div class="info-row"><span class="label">Username</span><span class="value">${escapeHtml(active.username)}</span></div>
           <div class="info-row"><span class="label">Status</span><span class="value">${escapeHtml(u.status || '—')}</span></div>
           <div class="info-row"><span class="label">Expires</span><span class="value">${expiry}</span></div>
-          <div class="info-row"><span class="label">Active connections</span><span class="value">${escapeHtml(u.active_cons || '0')} / ${escapeHtml(u.max_connections || '—')}</span></div>
+          <div class="info-row"><span class="label">Connections</span><span class="value">${escapeHtml(u.active_cons || '0')} / ${escapeHtml(u.max_connections || '—')}</span></div>
           <div class="info-row"><span class="label">Server</span><span class="value">${escapeHtml(s.url || '—')}</span></div>
         ` : ''}
       </div>
@@ -610,15 +622,63 @@
       <div class="settings-section">
         <h3>Playback</h3>
         <div class="info-row">
-          <span class="label">Autoplay next</span>
+          <span class="label">Autoplay</span>
           <span class="value"><input type="checkbox" id="setting-autoplay" ${settings.autoplay ? 'checked' : ''}></span>
         </div>
       </div>
 
       <div class="settings-section">
+        <h3>Watch History</h3>
+        <div class="info-row"><span class="label">Live TV</span><span class="value">${(hist.live || []).length} items</span></div>
+        <div class="info-row"><span class="label">Movies</span><span class="value">${(hist.movies || []).length} items</span></div>
+        <div class="info-row"><span class="label">Series</span><span class="value">${(hist.series || []).length} items</span></div>
+        <div class="settings-actions">
+          <button class="btn-setting" data-act="clear-hist" data-kind="live">Clear Live History</button>
+          <button class="btn-setting" data-act="clear-hist" data-kind="movies">Clear Movies History</button>
+          <button class="btn-setting" data-act="clear-hist" data-kind="series">Clear Series History</button>
+          <button class="btn-setting btn-danger" data-act="clear-hist">Clear All History</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Favorites</h3>
+        <div class="info-row"><span class="label">Live TV</span><span class="value">${(favs.live || []).length} items</span></div>
+        <div class="info-row"><span class="label">Movies</span><span class="value">${(favs.movies || []).length} items</span></div>
+        <div class="info-row"><span class="label">Series</span><span class="value">${(favs.series || []).length} items</span></div>
+        <div class="settings-actions">
+          <button class="btn-setting" data-act="clear-fav" data-kind="live">Clear Live Favorites</button>
+          <button class="btn-setting" data-act="clear-fav" data-kind="movies">Clear Movie Favorites</button>
+          <button class="btn-setting" data-act="clear-fav" data-kind="series">Clear Series Favorites</button>
+          <button class="btn-setting btn-danger" data-act="clear-fav">Clear All Favorites</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Manage Playlists</h3>
+        <div class="info-row"><span class="label">Saved playlists</span><span class="value">${playlists.length}</span></div>
+        <div class="settings-actions">
+          <button class="btn-setting" data-act="switch">Switch / Add Playlist</button>
+          <button class="btn-setting" data-act="refresh">Refresh Cached Data</button>
+          <button class="btn-setting btn-danger" data-act="remove-active">Remove This Playlist</button>
+          <button class="btn-setting btn-danger" data-act="reset-all">Reset Everything</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Pair Device / Easy Setup</h3>
+        <p class="settings-desc">Don't want to type on the TV remote? Open the setup page on your phone, enter your login, and paste the short code here.</p>
+        <div class="info-row"><span class="label">Setup page</span><span class="value"><a href="https://mywolf2025.github.io/Mywolftv_player/setup.html" target="_blank" rel="noopener">mywolf2025.github.io/Mywolftv_player/setup.html</a></span></div>
+        <div class="pair-row">
+          <input type="text" id="pair-code-input" placeholder="Enter 3–8 character code" maxlength="12" autocapitalize="off" autocorrect="off" />
+          <button class="btn-setting btn-primary-inline" data-act="pair-apply">Apply Code</button>
+        </div>
+        <div id="pair-status" class="pair-status"></div>
+      </div>
+
+      <div class="settings-section">
         <h3>About</h3>
         <div class="info-row"><span class="label">App</span><span class="value">MyWolf TV Player</span></div>
-        <div class="info-row"><span class="label">Version</span><span class="value">1.0.0</span></div>
+        <div class="info-row"><span class="label">Version</span><span class="value">1.1.0</span></div>
         <div class="info-row"><span class="label">Website</span><span class="value"><a href="https://mywolftv.com" target="_blank" rel="noopener">mywolftv.com</a></span></div>
       </div>
     `;
@@ -627,10 +687,146 @@
 
     const chk = document.getElementById('setting-autoplay');
     chk.addEventListener('change', () => {
-      const s = MWStorage.getSettings();
-      s.autoplay = chk.checked;
-      MWStorage.saveSettings(s);
+      const st = MWStorage.getSettings();
+      st.autoplay = chk.checked;
+      MWStorage.saveSettings(st);
     });
+
+    wrap.querySelectorAll('[data-act]').forEach(btn => {
+      btn.addEventListener('click', () => handleSettingAction(btn.dataset.act, btn.dataset.kind));
+    });
+  }
+
+  function handleSettingAction(act, kind) {
+    if (act === 'clear-hist') {
+      const label = kind ? kind : 'all';
+      if (!confirm('Clear ' + label + ' history?')) return;
+      MWStorage.clearHistory(active.id, kind || null);
+      showToast('History cleared', 'success');
+      renderSettings();
+    } else if (act === 'clear-fav') {
+      const label = kind ? kind : 'all';
+      if (!confirm('Clear ' + label + ' favorites?')) return;
+      MWStorage.clearFavorites(active.id, kind || null);
+      showToast('Favorites cleared', 'success');
+      renderSettings();
+    } else if (act === 'switch') {
+      window.location.href = 'index.html';
+    } else if (act === 'refresh') {
+      state.categories = { live: [], movies: [], series: [] };
+      state.cache = { live: {}, movies: {}, series: {} };
+      showToast('Cache cleared. Reloading...', 'success');
+      setTimeout(() => switchView('live'), 400);
+    } else if (act === 'remove-active') {
+      if (!confirm('Remove this playlist from the device?')) return;
+      MWStorage.removePlaylist(active.id);
+      window.location.href = 'index.html';
+    } else if (act === 'reset-all') {
+      if (!confirm('Erase ALL data (playlists, favorites, history, settings)?')) return;
+      MWStorage.clearAll();
+      window.location.href = 'index.html';
+    } else if (act === 'pair-apply') {
+      applyPairCode();
+    }
+  }
+
+  async function applyPairCode() {
+    const input = document.getElementById('pair-code-input');
+    const status = document.getElementById('pair-status');
+    const raw = (input.value || '').trim();
+    if (!raw) {
+      status.textContent = 'Enter a code first.';
+      status.className = 'pair-status error';
+      return;
+    }
+    status.textContent = 'Fetching...';
+    status.className = 'pair-status';
+    try {
+      const cfg = await MWPair.fetch(raw);
+      if (!cfg || !cfg.type) throw new Error('Invalid pair payload');
+      const playlist = { ...cfg, id: 'pl_' + Date.now().toString(36), createdAt: Date.now() };
+      if (playlist.type === 'xtream') {
+        const tmp = new XtreamClient(playlist);
+        const info = await tmp.auth();
+        playlist.host = tmp.host;
+        playlist.userInfo = info.user_info || null;
+        playlist.serverInfo = info.server_info || null;
+      }
+      MWStorage.savePlaylist(playlist);
+      MWStorage.setActive(playlist);
+      status.textContent = 'Paired! Loading...';
+      status.className = 'pair-status success';
+      setTimeout(() => window.location.reload(), 600);
+    } catch (err) {
+      status.textContent = 'Failed: ' + err.message;
+      status.className = 'pair-status error';
+    }
+  }
+
+  // ========== Recent / History ==========
+  async function renderRecent() {
+    categoryList.style.display = '';
+    categoryList.innerHTML = '';
+    const hist = MWStorage.getHistory(active.id);
+
+    ['live', 'movies', 'series'].forEach(kind => {
+      const count = (hist[kind] || []).length;
+      const el = document.createElement('div');
+      el.className = 'category-item' + (state.selectedCategory.recent === kind ? ' active' : '');
+      el.innerHTML = `<span>${kind.charAt(0).toUpperCase() + kind.slice(1)}</span><span class="category-count">${count}</span>`;
+      el.addEventListener('click', () => {
+        state.selectedCategory.recent = kind;
+        renderRecent();
+      });
+      categoryList.appendChild(el);
+    });
+    if (!state.selectedCategory.recent) state.selectedCategory.recent = 'live';
+
+    const kind = state.selectedCategory.recent;
+    const entries = hist[kind] || [];
+    if (!entries.length) {
+      itemsGrid.innerHTML = '';
+      emptyState.hidden = false;
+      emptyState.querySelector('p').textContent = 'No recently played items yet.';
+      return;
+    }
+
+    clearLoading();
+    itemsGrid.className = 'items-grid';
+    itemsGrid.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    entries.forEach(entry => {
+      const card = document.createElement('div');
+      card.className = 'item-card' + (kind === 'live' ? ' channel' : '');
+      card.setAttribute('tabindex', '0');
+      const logo = entry.logo || '';
+      const posterHtml = logo
+        ? `<img class="item-poster" src="${escapeHtml(logo)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />`
+        : `<div class="item-poster" style="display:grid;place-items:center;color:#5f6690;font-size:11px;">No Image</div>`;
+      const when = entry.ts ? new Date(entry.ts).toLocaleString() : '';
+      card.innerHTML = `
+        ${posterHtml}
+        <div class="item-body">
+          <div class="item-name">${escapeHtml(entry.name)}</div>
+          <div class="item-meta">${escapeHtml(when)}</div>
+        </div>`;
+      card.addEventListener('click', () => replayFromHistory(kind, entry));
+      frag.appendChild(card);
+    });
+    itemsGrid.appendChild(frag);
+  }
+
+  async function replayFromHistory(kind, entry) {
+    if (active.type !== 'xtream' && kind !== 'live') {
+      showToast('Cannot replay — switch to Xtream playlist', 'error');
+      return;
+    }
+    const fakeItem = kind === 'series'
+      ? { series_id: entry.id, name: entry.name, cover: entry.logo }
+      : kind === 'movies'
+        ? { stream_id: entry.id, name: entry.name, stream_icon: entry.logo }
+        : { stream_id: entry.id, name: entry.name, stream_icon: entry.logo };
+    openItem(kind, fakeItem);
   }
 
   // ========== Search ==========
