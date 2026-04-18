@@ -7,6 +7,9 @@ on:
       - 'claude/**'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build APK
@@ -21,6 +24,11 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
       - name: Sync web assets into Android project
         run: |
@@ -41,15 +49,14 @@ jobs:
             -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=MyWolfTV, OU=Player, O=MyWolfTV, L=Unknown, ST=Unknown, C=US"
 
-      - name: Grant execute permission for Gradle
-        run: chmod +x android/gradlew || true
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.5'
 
       - name: Build release APK
         working-directory: android
-        run: gradle assembleRelease --no-daemon
+        run: gradle assembleRelease --no-daemon --stacktrace
 
       - name: Rename APK
         run: |
@@ -83,6 +90,6 @@ jobs:
             Commit: ${{ github.sha }}
           files: dist/mywolftv-player.apk
           prerelease: false
-          make_latest: true
+          make_latest: "true"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,11 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
-        <shape android:shape="rectangle">
-            <solid android:color="#070912"/>
-        </shape>
-    </item>
-    <item android:gravity="center">
-        <bitmap android:src="@drawable/ic_launcher_foreground" android:gravity="center"/>
+    <item android:drawable="@color/bg_dark" />
+    <item android:gravity="center" android:width="160dp" android:height="160dp">
+        <vector android:width="160dp" android:height="160dp"
+            android:viewportWidth="108" android:viewportHeight="108"
+            xmlns:aapt="http://schemas.android.com/aapt">
+            <group android:translateX="54" android:translateY="54">
+                <path android:pathData="M -34 -18 L -22 -30 L -14 -14 L 0 -22 L 14 -14 L 22 -30 L 34 -18 L 30 6 L 22 18 L 14 28 L -14 28 L -22 18 L -30 6 Z">
+                    <aapt:attr name="android:fillColor">
+                        <gradient android:startX="-34" android:startY="-30" android:endX="34" android:endY="28" android:type="linear">
+                            <item android:offset="0" android:color="#7C5CFF" />
+                            <item android:offset="1" android:color="#22D3EE" />
+                        </gradient>
+                    </aapt:attr>
+                </path>
+            </group>
+        </vector>
     </item>
 </layer-list>
