@@ -4,6 +4,9 @@ Premium IPTV web player for **mywolftv.com** subscriptions.
 
 A browser-based IPTV player inspired by IBO Pro Player, built with vanilla HTML/CSS/JS. No framework, no build step — just open `index.html` and go.
 
+**Want to install it on a Fire TV / Android TV via Downloader by AFTVnews?**
+See **[INSTALL_ON_TV.md](INSTALL_ON_TV.md)** for the one-URL sideload guide.
+
 ## Features
 
 - **Xtream Codes login** (host + username + password) — full Live TV, Movies (VOD), and Series support

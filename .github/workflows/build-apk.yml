@@ -1,0 +1,88 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Sync web assets into Android project
+        run: |
+          mkdir -p android/app/src/main/assets/css
+          mkdir -p android/app/src/main/assets/js
+          mkdir -p android/app/src/main/assets/assets
+          cp index.html player.html android/app/src/main/assets/
+          cp -r css/* android/app/src/main/assets/css/
+          cp -r js/* android/app/src/main/assets/js/
+          cp -r assets/* android/app/src/main/assets/assets/
+
+      - name: Generate debug keystore
+        run: |
+          keytool -genkey -v \
+            -keystore android/app/debug.keystore \
+            -storepass android -keypass android \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=MyWolfTV, OU=Player, O=MyWolfTV, L=Unknown, ST=Unknown, C=US"
+
+      - name: Grant execute permission for Gradle
+        run: chmod +x android/gradlew || true
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build release APK
+        working-directory: android
+        run: gradle assembleRelease --no-daemon
+
+      - name: Rename APK
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/app-release.apk dist/mywolftv-player.apk
+          ls -lh dist/
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mywolftv-player-apk
+          path: dist/mywolftv-player.apk
+          retention-days: 90
+
+      - name: Create or update "latest" release
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/claude/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: MyWolf TV Player — Latest Build
+          body: |
+            **MyWolf TV Player** — Android APK build
+
+            Download on your Fire TV / Android TV with the Downloader by AFTVnews app:
+
+            1. Open Downloader
+            2. Enter this URL:
+               `https://github.com/${{ github.repository }}/releases/download/latest/mywolftv-player.apk`
+            3. Install
+
+            Commit: ${{ github.sha }}
+          files: dist/mywolftv-player.apk
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
