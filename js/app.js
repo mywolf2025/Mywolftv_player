@@ -14,6 +14,7 @@
     items: { live: [], movies: [], series: [] }, // flattened lists
     cache: { live: {}, movies: {}, series: {} }, // keyed by category_id
     selectedCategory: { live: '*', movies: '*', series: '*' }, // '*' = all
+    userPickedCategory: { live: false, movies: false, series: false },
     filter: '',
     loading: false,
   };
@@ -59,6 +60,9 @@
     emptyState.hidden = false;
     emptyState.querySelector('p').textContent = msg || 'Loading...';
     itemsGrid.innerHTML = '';
+    const stale = itemsGrid.parentElement.querySelector('.load-more-btn');
+    if (stale) stale.remove();
+    state.renderCtx = null;
   }
   function clearLoading() {
     emptyState.hidden = true;
@@ -142,17 +146,24 @@
       else if (view === 'series') cats = await client.getSeriesCategories();
       state.categories[view] = Array.isArray(cats) ? cats : [];
     }
-    renderCategories(view);
 
-    const selCat = state.selectedCategory[view];
-    await loadCategoryItems(view, selCat);
+    // For big playlists, avoid defaulting to "All" — pick first category.
+    if (
+      state.selectedCategory[view] === '*' &&
+      !state.userPickedCategory[view] &&
+      state.categories[view].length > 0
+    ) {
+      state.selectedCategory[view] = String(state.categories[view][0].category_id);
+    }
+
+    renderCategories(view);
+    await loadCategoryItems(view, state.selectedCategory[view]);
   }
 
   async function loadCategoryItems(view, categoryId) {
     setLoading('Loading...');
     let items;
     if (categoryId === '*') {
-      // "All" — fetch without filter; some servers are slow, so reuse cache
       if (!state.cache[view]['*']) {
         if (view === 'live') items = await client.getLiveStreams();
         else if (view === 'movies') items = await client.getVodStreams();
@@ -165,7 +176,13 @@
         if (view === 'live') items = await client.getLiveStreams(categoryId);
         else if (view === 'movies') items = await client.getVodStreams(categoryId);
         else if (view === 'series') items = await client.getSeries(categoryId);
-        state.cache[view][categoryId] = Array.isArray(items) ? items : [];
+        items = Array.isArray(items) ? items : [];
+        // Some Xtream servers ignore category_id and return everything.
+        // If the payload is large, filter by category_id client-side.
+        if (items.length > 800) {
+          items = items.filter(it => String(it.category_id) === String(categoryId));
+        }
+        state.cache[view][categoryId] = items;
       }
       items = state.cache[view][categoryId];
     }
@@ -214,6 +231,7 @@
     all.innerHTML = `<span>All</span>`;
     all.addEventListener('click', () => {
       state.selectedCategory[view] = '*';
+      state.userPickedCategory[view] = true;
       loadView(view);
     });
     categoryList.appendChild(all);
@@ -225,13 +243,14 @@
       el.innerHTML = `<span title="${escapeHtml(cat.category_name)}">${escapeHtml(cat.category_name)}</span>${count}`;
       el.addEventListener('click', () => {
         state.selectedCategory[view] = String(cat.category_id);
+        state.userPickedCategory[view] = true;
         loadView(view);
       });
       categoryList.appendChild(el);
     });
   }
 
-  const PAGE_SIZE = 60;
+  const PAGE_SIZE = 36;
 
   function renderItems(view, items) {
     clearLoading();
@@ -281,7 +300,7 @@
       const fav = favIds.has(id) ? 'active' : '';
       const extra = (!isChannel && it.rating) ? `<div class="item-meta">${escapeHtml(it.rating)}</div>` : '';
       const posterHtml = logo
-        ? `<img class="item-poster" src="${escapeHtml(logo)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />`
+        ? `<img class="item-poster" src="${escapeHtml(logo)}" alt="" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'" />`
         : `<div class="item-poster" style="display:grid;place-items:center;color:#5f6690;font-size:11px;">No Image</div>`;
       card.innerHTML = `
         ${posterHtml}

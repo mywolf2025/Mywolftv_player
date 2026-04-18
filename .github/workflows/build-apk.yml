@@ -30,12 +30,19 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
+      - name: Bundle vendor libs (hls.js)
+        run: |
+          mkdir -p js/vendor
+          curl -sL -o js/vendor/hls.min.js \
+            https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js
+          ls -lh js/vendor/
+
       - name: Sync web assets into Android project
         run: |
           mkdir -p android/app/src/main/assets/css
-          mkdir -p android/app/src/main/assets/js
+          mkdir -p android/app/src/main/assets/js/vendor
           mkdir -p android/app/src/main/assets/assets
-          cp index.html player.html android/app/src/main/assets/
+          cp index.html player.html setup.html android/app/src/main/assets/ 2>/dev/null || cp index.html player.html android/app/src/main/assets/
           cp -r css/* android/app/src/main/assets/css/
           cp -r js/* android/app/src/main/assets/js/
           cp -r assets/* android/app/src/main/assets/assets/

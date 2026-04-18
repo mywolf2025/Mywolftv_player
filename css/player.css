@@ -307,6 +307,9 @@
   cursor: pointer;
   transition: transform 0.12s ease-out, border-color 0.12s ease-out;
   position: relative;
+  contain: layout paint;
+  content-visibility: auto;
+  contain-intrinsic-size: 300px 220px;
 }
 
 .item-card:hover {
