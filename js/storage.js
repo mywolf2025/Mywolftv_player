@@ -7,6 +7,8 @@
   const SETTINGS_KEY = 'mywolftv.settings';
   const HISTORY_KEY = 'mywolftv.history';
   const HISTORY_LIMIT = 30;
+  const RESUME_KEY = 'mywolftv.resume';
+  const DEVICE_KEY = 'mywolftv.deviceId';
 
   function read(key, fallback) {
     try {
@@ -104,8 +106,46 @@
       else all[playlistId] = { live: [], movies: [], series: [] };
       write(FAVS_KEY, all);
     },
+    getResume(playlistId, kind, id) {
+      const all = read(RESUME_KEY, {});
+      const k = `${playlistId}|${kind}|${id}`;
+      return all[k] || null;
+    },
+    saveResume(playlistId, kind, id, position, duration) {
+      if (!position || position < 15) return;
+      if (duration && position > duration - 30) {
+        Storage.clearResume(playlistId, kind, id);
+        return;
+      }
+      const all = read(RESUME_KEY, {});
+      const k = `${playlistId}|${kind}|${id}`;
+      all[k] = { position, duration: duration || 0, ts: Date.now() };
+      const keys = Object.keys(all);
+      if (keys.length > 200) {
+        keys.sort((a, b) => (all[a].ts || 0) - (all[b].ts || 0));
+        keys.slice(0, 50).forEach(x => delete all[x]);
+      }
+      write(RESUME_KEY, all);
+    },
+    clearResume(playlistId, kind, id) {
+      const all = read(RESUME_KEY, {});
+      const k = `${playlistId}|${kind}|${id}`;
+      if (all[k]) { delete all[k]; write(RESUME_KEY, all); }
+    },
+    clearAllResume() {
+      localStorage.removeItem(RESUME_KEY);
+    },
+    getDeviceId() {
+      let id = read(DEVICE_KEY, null);
+      if (!id) {
+        id = 'MW-' + Math.random().toString(36).slice(2, 6).toUpperCase()
+          + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+        write(DEVICE_KEY, id);
+      }
+      return id;
+    },
     clearAll() {
-      [PLAYLISTS_KEY, ACTIVE_KEY, FAVS_KEY, SETTINGS_KEY, HISTORY_KEY].forEach(k => localStorage.removeItem(k));
+      [PLAYLISTS_KEY, ACTIVE_KEY, FAVS_KEY, SETTINGS_KEY, HISTORY_KEY, RESUME_KEY].forEach(k => localStorage.removeItem(k));
     },
   };
 

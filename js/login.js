@@ -1,6 +1,19 @@
 (function () {
   'use strict';
 
+  // Auto-open directly into the active playlist unless the user
+  // explicitly requested the chooser (e.g. from Settings → Switch).
+  (function autoOpen() {
+    try {
+      const params = new URLSearchParams(location.search);
+      if (params.has('choose') || params.has('add')) return;
+      const active = MWStorage.getActive();
+      if (active) {
+        window.location.replace('player.html');
+      }
+    } catch (e) {}
+  })();
+
   const toast = document.getElementById('toast');
   function showToast(msg, type) {
     toast.textContent = msg;
@@ -186,15 +199,14 @@
 
   renderSaved();
 
-  // Auto-redirect if active playlist already selected
+  // If we were asked to show the chooser, surface a "Back to app" shortcut.
   const active = MWStorage.getActive();
   if (active) {
-    // Do not auto-redirect; let user choose. But show hint.
     const saved = document.getElementById('saved-playlists');
     if (saved) {
       const hint = document.createElement('div');
       hint.style.cssText = 'margin-top:10px;text-align:center;font-size:13px;color:var(--text-dim)';
-      hint.innerHTML = `<a href="player.html">Continue with "${escapeHtml(active.name)}" →</a>`;
+      hint.innerHTML = `<a href="player.html">← Back to "${escapeHtml(active.name)}"</a>`;
       saved.appendChild(hint);
     }
   }

@@ -40,6 +40,12 @@
   const playerLogo = $('#player-logo');
   const epgPanel = $('#epg-panel');
   const favBtn = $('#player-fav');
+  const audioBtn = $('#player-audio');
+  const subsBtn = $('#player-subs');
+  const qualityBtn = $('#player-quality');
+  const rateBtn = $('#player-rate');
+  const aspectBtn = $('#player-aspect');
+  const playerMenu = $('#player-menu');
   const clockEl = $('#clock');
 
   playlistName.textContent = active.name;
@@ -71,7 +77,10 @@
   // ========== Clock ==========
   function tickClock() {
     const d = new Date();
-    clockEl.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const fmt = (MWStorage.getSettings().timeFormat || '24h') === '12h';
+    clockEl.textContent = d.toLocaleTimeString([], {
+      hour: '2-digit', minute: '2-digit', hour12: fmt,
+    });
   }
   tickClock();
   setInterval(tickClock, 15000);
@@ -238,16 +247,35 @@
 
     cats.forEach(cat => {
       const el = document.createElement('div');
-      el.className = 'category-item' + (selected === String(cat.category_id) ? ' active' : '');
+      const adult = isAdultCategory(cat.category_name);
+      el.className = 'category-item' + (selected === String(cat.category_id) ? ' active' : '') + (adult ? ' locked' : '');
       const count = cat.count ? `<span class="category-count">${cat.count}</span>` : '';
-      el.innerHTML = `<span title="${escapeHtml(cat.category_name)}">${escapeHtml(cat.category_name)}</span>${count}`;
+      const lock = adult ? '<span class="lock-ic" title="PIN">🔒</span>' : '';
+      el.innerHTML = `<span title="${escapeHtml(cat.category_name)}">${lock}${escapeHtml(cat.category_name)}</span>${count}`;
       el.addEventListener('click', () => {
+        if (adult && !checkPin()) return;
         state.selectedCategory[view] = String(cat.category_id);
         state.userPickedCategory[view] = true;
         loadView(view);
       });
       categoryList.appendChild(el);
     });
+  }
+
+  function isAdultCategory(name) {
+    if (!name) return false;
+    const n = String(name).toLowerCase();
+    return /\b(xxx|adult|18\+|porn|erotic)\b/.test(n);
+  }
+
+  function checkPin() {
+    const set = MWStorage.getSettings();
+    if (!set.pin) return true;
+    if (state.pinUnlocked) return true;
+    const entered = prompt('Enter PIN:');
+    if (entered === set.pin) { state.pinUnlocked = true; return true; }
+    showToast('Wrong PIN', 'error');
+    return false;
   }
 
   const PAGE_SIZE = 36;
@@ -292,7 +320,8 @@
       const it = filtered[i];
       const id = String(it.stream_id || it.series_id || it.id);
       const name = it.name || it.title || 'Unknown';
-      const logo = it.stream_icon || it.cover || it.logo || '';
+      const showLogos = MWStorage.getSettings().showLogos !== false;
+      const logo = showLogos ? (it.stream_icon || it.cover || it.logo || '') : '';
       const isChannel = view === 'live';
       const card = document.createElement('div');
       card.className = 'item-card' + (isChannel ? ' channel' : '');
@@ -347,7 +376,9 @@
       logo = item.stream_icon || item.logo || '';
       if (active.type === 'xtream') {
         streamId = item.stream_id;
-        url = client.liveStreamUrl(streamId);
+        const fmt = (MWStorage.getSettings().streamFormat || 'auto');
+        const ext = fmt === 'ts' ? 'ts' : 'm3u8';
+        url = client.liveStreamUrl(streamId, ext);
       } else {
         url = item.url;
       }
@@ -392,7 +423,30 @@
     };
 
     epgPanel.innerHTML = '';
+    playerMenu.hidden = true;
+    audioBtn.hidden = subsBtn.hidden = qualityBtn.hidden = true;
+    rateBtn.hidden = (view === 'live');
+    applyAspect();
+
+    // Resume for movies and series only
+    const resumeKey = view === 'live' ? null : String(item.stream_id || item.series_id || item.id);
+    state.currentPlayback = { view, id: resumeKey, title };
+    const resume = resumeKey ? MWStorage.getResume(active.id, view, resumeKey) : null;
+
     playerModal.hidden = false;
+    player.on('tracks', updateTrackButtons);
+    if (resumeKey) {
+      const onLoaded = () => {
+        if (resume && resume.position > 15) {
+          try { video.currentTime = resume.position; } catch (e) {}
+          const mm = Math.floor(resume.position / 60);
+          const ss = Math.floor(resume.position % 60).toString().padStart(2, '0');
+          showToast('Resuming from ' + mm + ':' + ss, 'success');
+        }
+        video.removeEventListener('loadedmetadata', onLoaded);
+      };
+      video.addEventListener('loadedmetadata', onLoaded);
+    }
     player.play(url, {
       onError: (data) => {
         showToast('Playback error: ' + (data.details || 'stream unavailable'), 'error');
@@ -438,13 +492,121 @@
     if (e.target === playerModal) closePlayer();
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !playerModal.hidden) closePlayer();
+    if (e.key === 'Escape' && !playerModal.hidden) {
+      if (!playerMenu.hidden) { playerMenu.hidden = true; return; }
+      closePlayer();
+    }
   });
 
   function closePlayer() {
+    saveCurrentResume();
     playerModal.hidden = true;
+    playerMenu.hidden = true;
     player.destroy();
+    state.currentPlayback = null;
   }
+
+  function saveCurrentResume() {
+    const cp = state.currentPlayback;
+    if (!cp || !cp.id) return;
+    try {
+      MWStorage.saveResume(active.id, cp.view, cp.id, video.currentTime || 0, video.duration || 0);
+    } catch (e) {}
+  }
+
+  // Periodically persist resume position for VOD/series
+  setInterval(() => {
+    if (!playerModal.hidden && state.currentPlayback && state.currentPlayback.id) {
+      saveCurrentResume();
+    }
+  }, 10000);
+  window.addEventListener('beforeunload', saveCurrentResume);
+
+  // Keyboard seek / play-pause while in player
+  document.addEventListener('keydown', (e) => {
+    if (playerModal.hidden) return;
+    if (!playerMenu.hidden) return; // menu owns arrows
+    if (state.currentPlayback && state.currentPlayback.view === 'live') return; // no seek on live
+    if (e.key === 'ArrowLeft') {
+      try { video.currentTime = Math.max(0, (video.currentTime || 0) - 10); } catch (err) {}
+      e.preventDefault();
+    } else if (e.key === 'ArrowRight') {
+      try { video.currentTime = Math.min((video.duration || 0), (video.currentTime || 0) + 10); } catch (err) {}
+      e.preventDefault();
+    } else if (e.key === ' ' || e.key === 'MediaPlayPause' || e.key === 'Enter') {
+      if (e.target && e.target.tagName === 'BUTTON') return;
+      if (video.paused) video.play(); else video.pause();
+      e.preventDefault();
+    } else if (e.key === 'MediaFastForward') {
+      try { video.currentTime = (video.currentTime || 0) + 30; } catch (err) {}
+    } else if (e.key === 'MediaRewind') {
+      try { video.currentTime = Math.max(0, (video.currentTime || 0) - 30); } catch (err) {}
+    }
+  });
+
+  // --- Player track / quality / aspect / rate menus ---
+  function updateTrackButtons(tracks) {
+    audioBtn.hidden = (tracks.audio.length < 2);
+    subsBtn.hidden = (tracks.subtitle.length < 2);
+    qualityBtn.hidden = (tracks.quality.length < 2);
+  }
+
+  function showMenu(title, items, onPick) {
+    playerMenu.innerHTML = `<div class="pm-title">${escapeHtml(title)}</div>`
+      + items.map((it, i) => `<button data-idx="${i}" class="${it.active ? 'active' : ''}">${escapeHtml(it.name)}</button>`).join('');
+    playerMenu.hidden = false;
+    playerMenu.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.idx);
+        onPick(items[idx]);
+        playerMenu.hidden = true;
+      });
+    });
+    const first = playerMenu.querySelector('button.active') || playerMenu.querySelector('button');
+    if (first) first.focus();
+  }
+
+  audioBtn.addEventListener('click', () => {
+    const t = player.tracks();
+    showMenu('Audio', t.audio, (p) => player.setAudioTrack(p.id));
+  });
+  subsBtn.addEventListener('click', () => {
+    const t = player.tracks();
+    showMenu('Subtitles', t.subtitle, (p) => player.setSubtitleTrack(p.id));
+  });
+  qualityBtn.addEventListener('click', () => {
+    const t = player.tracks();
+    showMenu('Quality', t.quality, (p) => player.setQuality(p.id));
+  });
+  rateBtn.addEventListener('click', () => {
+    const rates = [0.5, 0.75, 1, 1.25, 1.5, 2].map(r => ({
+      id: r, name: r + '×', active: Math.abs(video.playbackRate - r) < 0.01,
+    }));
+    showMenu('Speed', rates, (p) => player.setPlaybackRate(p.id));
+  });
+
+  const ASPECTS = ['contain', 'fill', 'cover', 'zoom'];
+  const ASPECT_LABELS = { contain: 'Fit', fill: 'Stretch', cover: 'Fill', zoom: 'Zoom' };
+  function applyAspect() {
+    const s = MWStorage.getSettings();
+    const a = s.aspect || 'contain';
+    video.classList.remove('fit-fill', 'fit-cover', 'fit-zoom');
+    if (a === 'fill') video.classList.add('fit-fill');
+    else if (a === 'cover') video.classList.add('fit-cover');
+    else if (a === 'zoom') video.classList.add('fit-zoom');
+  }
+  aspectBtn.addEventListener('click', () => {
+    const items = ASPECTS.map(a => {
+      const cur = (MWStorage.getSettings().aspect || 'contain');
+      return { id: a, name: ASPECT_LABELS[a], active: a === cur };
+    });
+    showMenu('Aspect', items, (p) => {
+      const s = MWStorage.getSettings();
+      s.aspect = p.id;
+      MWStorage.saveSettings(s);
+      applyAspect();
+    });
+  });
 
   // ========== Search ==========
   function renderSearch() {
@@ -644,6 +806,58 @@
           <span class="label">Autoplay</span>
           <span class="value"><input type="checkbox" id="setting-autoplay" ${settings.autoplay ? 'checked' : ''}></span>
         </div>
+        <div class="info-row">
+          <span class="label">Show channel logos</span>
+          <span class="value"><input type="checkbox" id="setting-logos" ${settings.showLogos !== false ? 'checked' : ''}></span>
+        </div>
+        <div class="info-row">
+          <span class="label">Default aspect ratio</span>
+          <span class="value"><select id="setting-aspect">
+            <option value="contain" ${settings.aspect === 'contain' || !settings.aspect ? 'selected' : ''}>Fit</option>
+            <option value="fill" ${settings.aspect === 'fill' ? 'selected' : ''}>Stretch</option>
+            <option value="cover" ${settings.aspect === 'cover' ? 'selected' : ''}>Fill</option>
+            <option value="zoom" ${settings.aspect === 'zoom' ? 'selected' : ''}>Zoom</option>
+          </select></span>
+        </div>
+        <div class="info-row">
+          <span class="label">Stream format</span>
+          <span class="value"><select id="setting-stream">
+            <option value="auto" ${!settings.streamFormat || settings.streamFormat === 'auto' ? 'selected' : ''}>Auto</option>
+            <option value="m3u8" ${settings.streamFormat === 'm3u8' ? 'selected' : ''}>HLS (m3u8)</option>
+            <option value="ts" ${settings.streamFormat === 'ts' ? 'selected' : ''}>MPEG-TS (ts)</option>
+          </select></span>
+        </div>
+        <div class="info-row">
+          <span class="label">Buffer length (s)</span>
+          <span class="value"><select id="setting-buffer">
+            <option value="10" ${settings.bufferLen == 10 ? 'selected' : ''}>10 (low latency)</option>
+            <option value="30" ${!settings.bufferLen || settings.bufferLen == 30 ? 'selected' : ''}>30 (default)</option>
+            <option value="60" ${settings.bufferLen == 60 ? 'selected' : ''}>60 (smooth)</option>
+          </select></span>
+        </div>
+        <div class="info-row">
+          <span class="label">Time format</span>
+          <span class="value"><select id="setting-time">
+            <option value="24h" ${!settings.timeFormat || settings.timeFormat === '24h' ? 'selected' : ''}>24-hour</option>
+            <option value="12h" ${settings.timeFormat === '12h' ? 'selected' : ''}>12-hour (AM/PM)</option>
+          </select></span>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Parental Control</h3>
+        <div class="info-row">
+          <span class="label">PIN (4 digits, blank = off)</span>
+          <span class="value"><input type="password" id="setting-pin" maxlength="4" inputmode="numeric" value="${escapeHtml(settings.pin || '')}" style="width:80px;text-align:center;letter-spacing:4px;padding:6px;background:var(--bg-1);border:1px solid var(--border);border-radius:6px;color:var(--text)"></span>
+        </div>
+        <div class="settings-desc">A 4-digit PIN blocks access to categories whose name contains "XXX", "Adult", or "18+".</div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Device Info</h3>
+        <div class="info-row"><span class="label">Device ID</span><span class="value" style="font-family:monospace">${escapeHtml(MWStorage.getDeviceId())}</span></div>
+        <div class="info-row"><span class="label">Platform</span><span class="value">${escapeHtml(navigator.userAgent.slice(0, 60))}</span></div>
+        <div class="info-row"><span class="label">Screen</span><span class="value">${window.innerWidth}×${window.innerHeight}</span></div>
       </div>
 
       <div class="settings-section">
@@ -673,11 +887,12 @@
       </div>
 
       <div class="settings-section">
-        <h3>Manage Playlists</h3>
+        <h3>Manage Playlists &amp; Data</h3>
         <div class="info-row"><span class="label">Saved playlists</span><span class="value">${playlists.length}</span></div>
         <div class="settings-actions">
           <button class="btn-setting" data-act="switch">Switch / Add Playlist</button>
           <button class="btn-setting" data-act="refresh">Refresh Cached Data</button>
+          <button class="btn-setting" data-act="clear-resume">Clear Resume Positions</button>
           <button class="btn-setting btn-danger" data-act="remove-active">Remove This Playlist</button>
           <button class="btn-setting btn-danger" data-act="reset-all">Reset Everything</button>
         </div>
@@ -704,12 +919,24 @@
 
     itemsGrid.appendChild(wrap);
 
-    const chk = document.getElementById('setting-autoplay');
-    chk.addEventListener('change', () => {
-      const st = MWStorage.getSettings();
-      st.autoplay = chk.checked;
-      MWStorage.saveSettings(st);
-    });
+    function bind(id, key, transform) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const evt = el.type === 'checkbox' ? 'change' : (el.tagName === 'SELECT' ? 'change' : 'input');
+      el.addEventListener(evt, () => {
+        const st = MWStorage.getSettings();
+        const v = el.type === 'checkbox' ? el.checked : el.value;
+        st[key] = transform ? transform(v) : v;
+        MWStorage.saveSettings(st);
+      });
+    }
+    bind('setting-autoplay', 'autoplay');
+    bind('setting-logos', 'showLogos');
+    bind('setting-aspect', 'aspect');
+    bind('setting-stream', 'streamFormat');
+    bind('setting-buffer', 'bufferLen', Number);
+    bind('setting-time', 'timeFormat');
+    bind('setting-pin', 'pin', v => String(v).replace(/\D/g, '').slice(0, 4));
 
     wrap.querySelectorAll('[data-act]').forEach(btn => {
       btn.addEventListener('click', () => handleSettingAction(btn.dataset.act, btn.dataset.kind));
@@ -730,20 +957,24 @@
       showToast('Favorites cleared', 'success');
       renderSettings();
     } else if (act === 'switch') {
-      window.location.href = 'index.html';
+      window.location.href = 'index.html?choose=1';
     } else if (act === 'refresh') {
       state.categories = { live: [], movies: [], series: [] };
       state.cache = { live: {}, movies: {}, series: {} };
       showToast('Cache cleared. Reloading...', 'success');
       setTimeout(() => switchView('live'), 400);
+    } else if (act === 'clear-resume') {
+      if (!confirm('Clear all saved resume positions?')) return;
+      MWStorage.clearAllResume();
+      showToast('Resume positions cleared', 'success');
     } else if (act === 'remove-active') {
       if (!confirm('Remove this playlist from the device?')) return;
       MWStorage.removePlaylist(active.id);
-      window.location.href = 'index.html';
+      window.location.href = 'index.html?choose=1';
     } else if (act === 'reset-all') {
       if (!confirm('Erase ALL data (playlists, favorites, history, settings)?')) return;
       MWStorage.clearAll();
-      window.location.href = 'index.html';
+      window.location.href = 'index.html?choose=1';
     } else if (act === 'pair-apply') {
       applyPairCode();
     }
