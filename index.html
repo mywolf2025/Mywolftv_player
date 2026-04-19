@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MyWolf TV Player</title>
+  <link rel="icon" type="image/svg+xml" href="assets/logo.svg" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="login-body">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="brand">
+        <img src="assets/logo.svg" alt="MyWolf TV" class="brand-logo" />
+        <div class="brand-text">
+          <h1>MyWolf <span>TV</span></h1>
+          <p>Premium IPTV Player</p>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="xtream">Xtream</button>
+        <button class="tab" data-tab="m3u">M3U</button>
+        <button class="tab" data-tab="pair">Pair Code</button>
+      </div>
+
+      <form id="xtream-form" class="login-form active" autocomplete="off">
+        <label>
+          <span>Playlist Name</span>
+          <input type="text" name="name" placeholder="My Playlist" required />
+        </label>
+        <label>
+          <span>Host / Server URL</span>
+          <input type="url" name="host" placeholder="http://example.com:8080" required />
+        </label>
+        <div class="row-2">
+          <label>
+            <span>Username</span>
+            <input type="text" name="username" required />
+          </label>
+          <label>
+            <span>Password</span>
+            <input type="password" name="password" required />
+          </label>
+        </div>
+        <button type="submit" class="btn-primary">
+          <span>Connect</span>
+        </button>
+      </form>
+
+      <form id="m3u-form" class="login-form" autocomplete="off">
+        <label>
+          <span>Playlist Name</span>
+          <input type="text" name="name" placeholder="My M3U" required />
+        </label>
+        <label>
+          <span>M3U URL</span>
+          <input type="url" name="url" placeholder="http://example.com/playlist.m3u" required />
+        </label>
+        <label>
+          <span>EPG URL (optional)</span>
+          <input type="url" name="epg" placeholder="http://example.com/epg.xml" />
+        </label>
+        <button type="submit" class="btn-primary">
+          <span>Load Playlist</span>
+        </button>
+      </form>
+
+      <form id="pair-form" class="login-form" autocomplete="off">
+        <div class="pair-hint">
+          <strong>Easy setup — no typing on TV</strong>
+          <p>On your phone, open <a href="https://mywolf2025.github.io/Mywolftv_player/setup.html" target="_blank" rel="noopener">mywolf2025.github.io/Mywolftv_player/setup.html</a>, enter your Xtream details, then type the short code shown below.</p>
+        </div>
+        <label>
+          <span>Pair Code</span>
+          <input type="text" name="code" placeholder="e.g. 7aB" required maxlength="12" autocapitalize="off" autocorrect="off" />
+        </label>
+        <button type="submit" class="btn-primary">
+          <span>Pair &amp; Load</span>
+        </button>
+      </form>
+
+      <div id="saved-playlists" class="saved-playlists"></div>
+
+      <div class="login-footer">
+        <p>MyWolf TV &copy; 2026 &middot; <a href="https://mywolftv.com" target="_blank" rel="noopener">mywolftv.com</a></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="js/storage.js"></script>
+  <script src="js/xtream.js"></script>
+  <script src="js/pair.js"></script>
+  <script src="js/login.js"></script>
+  <script src="js/tv-nav.js"></script>
+</body>
+</html>
