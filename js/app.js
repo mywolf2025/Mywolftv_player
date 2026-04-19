@@ -901,7 +901,7 @@
       <div class="settings-section">
         <h3>Pair Device / Easy Setup</h3>
         <p class="settings-desc">Don't want to type on the TV remote? Open the setup page on your phone, enter your login, and paste the short code here.</p>
-        <div class="info-row"><span class="label">Setup page</span><span class="value"><a href="https://raw.githack.com/mywolf2025/Mywolftv_player/claude/build-mywolftv-F74b1/setup.html" target="_blank" rel="noopener">raw.githack.com/.../setup.html</a></span></div>
+        <div class="info-row"><span class="label">Setup page</span><span class="value"><a href="https://mywolf2025.github.io/Mywolftv_player/setup.html" target="_blank" rel="noopener">mywolf2025.github.io/Mywolftv_player/setup.html</a></span></div>
         <div class="pair-row">
           <input type="text" id="pair-code-input" placeholder="Enter 3–8 character code" maxlength="12" autocapitalize="off" autocorrect="off" />
           <button class="btn-setting btn-primary-inline" data-act="pair-apply">Apply Code</button>
