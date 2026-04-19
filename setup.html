@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MyWolf TV — Setup</title>
+  <link rel="icon" type="image/svg+xml" href="assets/logo.svg" />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .setup-wrap { max-width: 560px; margin: 0 auto; padding: 24px 16px 48px; }
+    .code-box {
+      margin-top: 18px;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      text-align: center;
+    }
+    .code-box .big {
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: 6px;
+      background: var(--grad);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin: 6px 0 14px;
+    }
+    .code-box .hint { font-size: 13px; color: var(--text-dim); }
+    .code-box img { margin: 14px auto 4px; display: block; background: #fff; padding: 8px; border-radius: 8px; }
+    .copy-btn {
+      margin-top: 10px;
+      padding: 8px 16px;
+      background: var(--bg-3);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 600;
+    }
+    .step {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      margin-top: 14px;
+      font-size: 14px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+    .step strong { color: var(--text); }
+  </style>
+</head>
+<body class="login-body">
+  <div class="setup-wrap">
+    <div class="login-card">
+      <div class="brand">
+        <img src="assets/logo.svg" alt="MyWolf TV" class="brand-logo" />
+        <div class="brand-text">
+          <h1>MyWolf <span>TV</span></h1>
+          <p>Device Setup &amp; Pairing</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <strong>Step 1 —</strong> Enter your IPTV login below.<br/>
+        <strong>Step 2 —</strong> Copy the 3-char code (or scan the QR).<br/>
+        <strong>Step 3 —</strong> On your TV, open the MyWolf TV Player, pick the <em>Pair Code</em> tab, and enter the code.
+      </div>
+
+      <div class="tabs" style="margin-top: 18px;">
+        <button class="tab active" data-tab="xtream">Xtream</button>
+        <button class="tab" data-tab="m3u">M3U URL</button>
+      </div>
+
+      <form id="setup-xtream" class="login-form active" autocomplete="off">
+        <label>
+          <span>Playlist Name</span>
+          <input type="text" name="name" placeholder="My Playlist" required />
+        </label>
+        <label>
+          <span>Host / Server URL</span>
+          <input type="url" name="host" placeholder="http://example.com:8080" required />
+        </label>
+        <div class="row-2">
+          <label>
+            <span>Username</span>
+            <input type="text" name="username" required />
+          </label>
+          <label>
+            <span>Password</span>
+            <input type="password" name="password" required />
+          </label>
+        </div>
+        <button type="submit" class="btn-primary"><span>Generate Code</span></button>
+      </form>
+
+      <form id="setup-m3u" class="login-form" autocomplete="off">
+        <label>
+          <span>Playlist Name</span>
+          <input type="text" name="name" placeholder="My M3U" required />
+        </label>
+        <label>
+          <span>M3U URL</span>
+          <input type="url" name="url" placeholder="http://example.com/playlist.m3u" required />
+        </label>
+        <label>
+          <span>EPG URL (optional)</span>
+          <input type="url" name="epg" />
+        </label>
+        <button type="submit" class="btn-primary"><span>Generate Code</span></button>
+      </form>
+
+      <div id="code-box" class="code-box" hidden>
+        <div class="hint">Your pair code:</div>
+        <div id="code-val" class="big">—</div>
+        <img id="code-qr" alt="" width="180" height="180" />
+        <div class="hint">Code expires when the paste service removes it (usually 24h+).</div>
+        <button class="copy-btn" id="copy-btn">Copy Code</button>
+      </div>
+
+      <div class="login-footer" style="margin-top:20px;">
+        <p>Credentials are uploaded anonymously to <code>paste.rs</code> in lightly obfuscated form. For sensitive credentials, prefer manual entry on the TV.</p>
+        <p style="margin-top:8px;">MyWolf TV &copy; 2026 &middot; <a href="https://mywolftv.com" target="_blank" rel="noopener">mywolftv.com</a></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="js/pair.js"></script>
+  <script>
+    (function () {
+      const toast = document.getElementById('toast');
+      function showToast(msg, type) {
+        toast.textContent = msg;
+        toast.className = 'toast show' + (type ? ' ' + type : '');
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(() => { toast.className = 'toast'; }, 3000);
+      }
+
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.login-form').forEach(f => f.classList.remove('active'));
+          tab.classList.add('active');
+          const t = tab.getAttribute('data-tab');
+          document.getElementById('setup-' + t).classList.add('active');
+        });
+      });
+
+      function setLoading(btn, loading) {
+        if (loading) { btn.dataset.orig = btn.innerHTML; btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true; }
+        else { btn.innerHTML = btn.dataset.orig || btn.innerHTML; btn.disabled = false; }
+      }
+
+      async function publishConfig(cfg, btn) {
+        setLoading(btn, true);
+        try {
+          const code = await MWPair.publish(cfg);
+          showCode(code);
+          showToast('Code generated', 'success');
+        } catch (err) {
+          showToast('Failed: ' + err.message, 'error');
+        } finally {
+          setLoading(btn, false);
+        }
+      }
+
+      function showCode(code) {
+        const box = document.getElementById('code-box');
+        document.getElementById('code-val').textContent = code;
+        const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent('MWTVCODE:' + code);
+        document.getElementById('code-qr').src = qr;
+        box.hidden = false;
+        box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
+      document.getElementById('copy-btn').addEventListener('click', () => {
+        const val = document.getElementById('code-val').textContent;
+        navigator.clipboard.writeText(val).then(
+          () => showToast('Copied to clipboard', 'success'),
+          () => showToast('Copy failed', 'error')
+        );
+      });
+
+      document.getElementById('setup-xtream').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const f = e.target;
+        publishConfig({
+          type: 'xtream',
+          name: f.name.value.trim(),
+          host: f.host.value.trim(),
+          username: f.username.value.trim(),
+          password: f.password.value.trim(),
+        }, f.querySelector('button[type=submit]'));
+      });
+
+      document.getElementById('setup-m3u').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const f = e.target;
+        publishConfig({
+          type: 'm3u',
+          name: f.name.value.trim(),
+          url: f.url.value.trim(),
+          epg: f.epg.value.trim(),
+        }, f.querySelector('button[type=submit]'));
+      });
+    })();
+  </script>
+</body>
+</html>
