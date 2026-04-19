@@ -47,8 +47,24 @@
   const aspectBtn = $('#player-aspect');
   const playerMenu = $('#player-menu');
   const clockEl = $('#clock');
+  const hubEl = $('#hub');
+  const hubClock = $('#hub-clock');
+  const hubExpiry = $('#hub-expiry');
+  const topExpiry = $('#topbar-expiry');
+  const hubPlaylistName = $('#hub-playlist-name');
+  const backHubBtn = $('#back-hub');
+  const appBody = document.body;
+  const channelCol = $('#channel-col');
+  const content = $('#content');
 
   playlistName.textContent = active.name;
+  if (hubPlaylistName) hubPlaylistName.textContent = active.name;
+
+  // Playlist expiry banner
+  const u0 = active.userInfo || {};
+  const expTxt = u0.exp_date ? 'Expires: ' + new Date(Number(u0.exp_date) * 1000).toLocaleDateString() : '';
+  if (hubExpiry) hubExpiry.textContent = expTxt;
+  if (topExpiry) topExpiry.textContent = expTxt;
 
   const player = new MWPlayer(video);
 
@@ -78,12 +94,53 @@
   function tickClock() {
     const d = new Date();
     const fmt = (MWStorage.getSettings().timeFormat || '24h') === '12h';
-    clockEl.textContent = d.toLocaleTimeString([], {
+    const txt = d.toLocaleTimeString([], {
       hour: '2-digit', minute: '2-digit', hour12: fmt,
     });
+    clockEl.textContent = txt;
+    if (hubClock) hubClock.textContent = txt;
   }
   tickClock();
   setInterval(tickClock, 15000);
+
+  // ========== Hub ==========
+  function showHub() {
+    appBody.classList.add('hub-mode');
+    if (hubEl) hubEl.hidden = false;
+    state.view = 'hub';
+  }
+  function hideHub() {
+    appBody.classList.remove('hub-mode');
+    if (hubEl) hubEl.hidden = true;
+  }
+  document.querySelectorAll('[data-hub]').forEach(tile => {
+    tile.addEventListener('click', () => {
+      const act = tile.getAttribute('data-hub');
+      if (act === 'exit') {
+        try { if (window.Android && Android.exitApp) Android.exitApp(); } catch (e) {}
+        window.close();
+        return;
+      }
+      if (act === 'switch') {
+        window.location.href = 'index.html?choose=1';
+        return;
+      }
+      if (act === 'reload') {
+        state.categories = { live: [], movies: [], series: [] };
+        state.cache = { live: {}, movies: {}, series: {} };
+        showToast('Reloading...', 'success');
+        hideHub();
+        setTimeout(() => switchView('live'), 300);
+        return;
+      }
+      hideHub();
+      switchView(act);
+    });
+  });
+  if (backHubBtn) backHubBtn.addEventListener('click', () => {
+    try { player.destroy(); } catch (e) {}
+    showHub();
+  });
 
   // ========== Navigation ==========
   document.querySelectorAll('.nav-item').forEach(btn => {
@@ -133,6 +190,7 @@
     if (view === 'favorites' || view === 'search' || view === 'settings') return;
 
     categoryList.style.display = '';
+    if (categoryList.parentElement) categoryList.parentElement.style.display = '';
     setLoading('Loading ' + view + '...');
 
     try {
@@ -404,14 +462,17 @@
       }
     }
 
-    playerTitle.textContent = title;
-    playerProgram.textContent = '';
-    if (logo) { playerLogo.src = logo; playerLogo.style.display = ''; } else { playerLogo.style.display = 'none'; }
-
     try {
       const histId = String(item.stream_id || item.series_id || item.id);
       MWStorage.addHistory(active.id, view, { id: histId, name: title, logo });
     } catch (e) {}
+
+    // Route to external player if configured
+    if (openExternal(url, title)) return;
+
+    playerTitle.textContent = title;
+    playerProgram.textContent = '';
+    if (logo) { playerLogo.src = logo; playerLogo.style.display = ''; } else { playerLogo.style.display = 'none'; }
 
     const kind = view;
     const id = String(item.stream_id || item.series_id || item.id);
@@ -611,6 +672,8 @@
   // ========== Search ==========
   function renderSearch() {
     categoryList.style.display = '';
+    if (categoryList.parentElement) categoryList.parentElement.style.display = '';
+    if (channelCol) channelCol.hidden = true;
     categoryList.innerHTML = `
       <div class="category-item active">All content</div>
     `;
@@ -721,6 +784,8 @@
   // ========== Favorites ==========
   async function renderFavorites() {
     categoryList.style.display = '';
+    if (categoryList.parentElement) categoryList.parentElement.style.display = '';
+    if (channelCol) channelCol.hidden = true;
     categoryList.innerHTML = '';
     ['live', 'movies', 'series'].forEach(kind => {
       const count = (MWStorage.getFavorites(active.id)[kind] || []).length;
@@ -767,216 +832,233 @@
     }
   }
 
-  // ========== Settings ==========
+  // ========== Settings (tile grid) ==========
   function renderSettings() {
-    categoryList.style.display = 'none';
+    if (categoryList.parentElement) categoryList.parentElement.style.display = 'none';
+    if (channelCol) channelCol.hidden = true;
     itemsGrid.className = 'items-grid list';
     itemsGrid.innerHTML = '';
     emptyState.hidden = true;
 
-    const wrap = document.createElement('div');
-    wrap.className = 'settings-wrap';
+    const settings = MWStorage.getSettings();
+    const did = MWStorage.getDeviceId();
+    const ext = settings.externalPlayer || 'default';
+    const asp = settings.aspect || 'contain';
+    const tf = settings.timeFormat || '24h';
+    const sf = settings.streamFormat || 'auto';
+    const bf = settings.bufferLen || 30;
+    const aspLabel = { contain: 'Fit', fill: 'Stretch', cover: 'Fill', zoom: 'Zoom' }[asp] || asp;
+    const extLabel = ext === 'default' ? 'Default' : (ext === 'vlc' ? 'VLC' : 'MX Player');
+
+    const tiles = [
+      ['switch',      'Add Playlist',        '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 7h-2v4H7v2h4v4h2v-4h4v-2h-4V7zm-1-5C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>', null],
+      ['pin',         'Parental Control',    '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10zM12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/></svg>', settings.pin ? 'On' : 'Off'],
+      ['switch',      'Change Playlist',     '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>', null],
+      ['language',    'Change Language',     '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.87 15.07l-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>', null],
+      ['layout',      'Change Layout',       '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3zm0 10h8v8H3zm10-10h8v8h-8zm0 10h8v8h-8z"/></svg>', null],
+      ['logos',       'Show Channel Logos',  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5 5-5zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>', settings.showLogos !== false ? 'On' : 'Off'],
+      ['clear-hist-l','Clear Live History',  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>', null],
+      ['clear-hist-m','Clear Movies History','<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>', null],
+      ['clear-hist-s','Clear Series History','<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>', null],
+      ['sort',        'Live Channel Sort',   '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/></svg>', settings.sortChannels || 'Default'],
+      ['stream',      'Live Stream Format',  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18v12z"/></svg>', sf.toUpperCase()],
+      ['extplayer',   'External Players',    '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>', extLabel],
+      ['aspect',      'Aspect Ratio',        '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 7v10H5V7h14m0-2H5c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"/></svg>', aspLabel],
+      ['buffer',      'Buffer Length',       '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 2c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6H6z"/></svg>', bf + 's'],
+      ['time',        'Time Format',         '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z"/></svg>', tf],
+      ['subs',        'Subtitles',           '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM4 12h4v2H4v-2zm10 6H4v-2h10v2zm6 0h-4v-2h4v2zm0-4H10v-2h10v2z"/></svg>', null],
+      ['device',      'Device Type',         '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 18v1c0 .55-.45 1-1 1H4c-.55 0-1-.45-1-1V5c0-.55.45-1 1-1h16c.55 0 1 .45 1 1v1h-9c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>', null],
+      ['pinoff',      settings.pin ? 'Parent Control Off' : 'Parent Control On', '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5-2.28 0-4.27 1.54-4.84 3.75l1.93.51C9.44 3.93 10.63 3 12 3c1.66 0 3 1.34 3 3v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/></svg>', null],
+      ['refresh',     'Update Now',          '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>', null],
+      ['reset-all',   'Reset Everything',    '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>', null],
+    ];
 
     const u = active.userInfo || {};
-    const s = active.serverInfo || {};
     const expiry = u.exp_date ? new Date(Number(u.exp_date) * 1000).toLocaleDateString() : '—';
-    const settings = MWStorage.getSettings();
-    const hist = MWStorage.getHistory(active.id);
-    const favs = MWStorage.getFavorites(active.id);
-    const playlists = MWStorage.getPlaylists();
 
+    const wrap = document.createElement('div');
+    wrap.className = 'settings-grid';
     wrap.innerHTML = `
-      <div class="settings-section">
-        <h3>Playlist Info</h3>
-        <div class="info-row"><span class="label">Name</span><span class="value">${escapeHtml(active.name)}</span></div>
-        <div class="info-row"><span class="label">Type</span><span class="value">${active.type === 'xtream' ? 'Xtream Codes' : 'M3U URL'}</span></div>
-        <div class="info-row"><span class="label">${active.type === 'xtream' ? 'Host' : 'URL'}</span><span class="value">${escapeHtml(active.type === 'xtream' ? active.host : active.url)}</span></div>
-        ${active.type === 'xtream' ? `
-          <div class="info-row"><span class="label">Username</span><span class="value">${escapeHtml(active.username)}</span></div>
-          <div class="info-row"><span class="label">Status</span><span class="value">${escapeHtml(u.status || '—')}</span></div>
-          <div class="info-row"><span class="label">Expires</span><span class="value">${expiry}</span></div>
-          <div class="info-row"><span class="label">Connections</span><span class="value">${escapeHtml(u.active_cons || '0')} / ${escapeHtml(u.max_connections || '—')}</span></div>
-          <div class="info-row"><span class="label">Server</span><span class="value">${escapeHtml(s.url || '—')}</span></div>
-        ` : ''}
+      <h2>Settings</h2>
+      <div class="st-grid">
+        ${tiles.map(([act, label, svg, val]) => `
+          <button class="st-tile" data-act="${act}" tabindex="0">
+            ${svg}
+            <div class="st-tile-info">
+              <div>${escapeHtml(label)}</div>
+              ${val ? `<div class="st-val">${escapeHtml(String(val))}</div>` : ''}
+            </div>
+          </button>
+        `).join('')}
       </div>
-
-      <div class="settings-section">
-        <h3>Playback</h3>
-        <div class="info-row">
-          <span class="label">Autoplay</span>
-          <span class="value"><input type="checkbox" id="setting-autoplay" ${settings.autoplay ? 'checked' : ''}></span>
-        </div>
-        <div class="info-row">
-          <span class="label">Show channel logos</span>
-          <span class="value"><input type="checkbox" id="setting-logos" ${settings.showLogos !== false ? 'checked' : ''}></span>
-        </div>
-        <div class="info-row">
-          <span class="label">Default aspect ratio</span>
-          <span class="value"><select id="setting-aspect">
-            <option value="contain" ${settings.aspect === 'contain' || !settings.aspect ? 'selected' : ''}>Fit</option>
-            <option value="fill" ${settings.aspect === 'fill' ? 'selected' : ''}>Stretch</option>
-            <option value="cover" ${settings.aspect === 'cover' ? 'selected' : ''}>Fill</option>
-            <option value="zoom" ${settings.aspect === 'zoom' ? 'selected' : ''}>Zoom</option>
-          </select></span>
-        </div>
-        <div class="info-row">
-          <span class="label">Stream format</span>
-          <span class="value"><select id="setting-stream">
-            <option value="auto" ${!settings.streamFormat || settings.streamFormat === 'auto' ? 'selected' : ''}>Auto</option>
-            <option value="m3u8" ${settings.streamFormat === 'm3u8' ? 'selected' : ''}>HLS (m3u8)</option>
-            <option value="ts" ${settings.streamFormat === 'ts' ? 'selected' : ''}>MPEG-TS (ts)</option>
-          </select></span>
-        </div>
-        <div class="info-row">
-          <span class="label">Buffer length (s)</span>
-          <span class="value"><select id="setting-buffer">
-            <option value="10" ${settings.bufferLen == 10 ? 'selected' : ''}>10 (low latency)</option>
-            <option value="30" ${!settings.bufferLen || settings.bufferLen == 30 ? 'selected' : ''}>30 (default)</option>
-            <option value="60" ${settings.bufferLen == 60 ? 'selected' : ''}>60 (smooth)</option>
-          </select></span>
-        </div>
-        <div class="info-row">
-          <span class="label">Time format</span>
-          <span class="value"><select id="setting-time">
-            <option value="24h" ${!settings.timeFormat || settings.timeFormat === '24h' ? 'selected' : ''}>24-hour</option>
-            <option value="12h" ${settings.timeFormat === '12h' ? 'selected' : ''}>12-hour (AM/PM)</option>
-          </select></span>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h3>Parental Control</h3>
-        <div class="info-row">
-          <span class="label">PIN (4 digits, blank = off)</span>
-          <span class="value"><input type="password" id="setting-pin" maxlength="4" inputmode="numeric" value="${escapeHtml(settings.pin || '')}" style="width:80px;text-align:center;letter-spacing:4px;padding:6px;background:var(--bg-1);border:1px solid var(--border);border-radius:6px;color:var(--text)"></span>
-        </div>
-        <div class="settings-desc">A 4-digit PIN blocks access to categories whose name contains "XXX", "Adult", or "18+".</div>
-      </div>
-
-      <div class="settings-section">
-        <h3>Device Info</h3>
-        <div class="info-row"><span class="label">Device ID</span><span class="value" style="font-family:monospace">${escapeHtml(MWStorage.getDeviceId())}</span></div>
-        <div class="info-row"><span class="label">Platform</span><span class="value">${escapeHtml(navigator.userAgent.slice(0, 60))}</span></div>
-        <div class="info-row"><span class="label">Screen</span><span class="value">${window.innerWidth}×${window.innerHeight}</span></div>
-      </div>
-
-      <div class="settings-section">
-        <h3>Watch History</h3>
-        <div class="info-row"><span class="label">Live TV</span><span class="value">${(hist.live || []).length} items</span></div>
-        <div class="info-row"><span class="label">Movies</span><span class="value">${(hist.movies || []).length} items</span></div>
-        <div class="info-row"><span class="label">Series</span><span class="value">${(hist.series || []).length} items</span></div>
-        <div class="settings-actions">
-          <button class="btn-setting" data-act="clear-hist" data-kind="live">Clear Live History</button>
-          <button class="btn-setting" data-act="clear-hist" data-kind="movies">Clear Movies History</button>
-          <button class="btn-setting" data-act="clear-hist" data-kind="series">Clear Series History</button>
-          <button class="btn-setting btn-danger" data-act="clear-hist">Clear All History</button>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h3>Favorites</h3>
-        <div class="info-row"><span class="label">Live TV</span><span class="value">${(favs.live || []).length} items</span></div>
-        <div class="info-row"><span class="label">Movies</span><span class="value">${(favs.movies || []).length} items</span></div>
-        <div class="info-row"><span class="label">Series</span><span class="value">${(favs.series || []).length} items</span></div>
-        <div class="settings-actions">
-          <button class="btn-setting" data-act="clear-fav" data-kind="live">Clear Live Favorites</button>
-          <button class="btn-setting" data-act="clear-fav" data-kind="movies">Clear Movie Favorites</button>
-          <button class="btn-setting" data-act="clear-fav" data-kind="series">Clear Series Favorites</button>
-          <button class="btn-setting btn-danger" data-act="clear-fav">Clear All Favorites</button>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h3>Manage Playlists &amp; Data</h3>
-        <div class="info-row"><span class="label">Saved playlists</span><span class="value">${playlists.length}</span></div>
-        <div class="settings-actions">
-          <button class="btn-setting" data-act="switch">Switch / Add Playlist</button>
-          <button class="btn-setting" data-act="refresh">Refresh Cached Data</button>
-          <button class="btn-setting" data-act="clear-resume">Clear Resume Positions</button>
-          <button class="btn-setting btn-danger" data-act="remove-active">Remove This Playlist</button>
-          <button class="btn-setting btn-danger" data-act="reset-all">Reset Everything</button>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h3>Pair Device / Easy Setup</h3>
-        <p class="settings-desc">Don't want to type on the TV remote? Open the setup page on your phone, enter your login, and paste the short code here.</p>
-        <div class="info-row"><span class="label">Setup page</span><span class="value"><a href="https://mywolf2025.github.io/Mywolftv_player/setup.html" target="_blank" rel="noopener">mywolf2025.github.io/Mywolftv_player/setup.html</a></span></div>
-        <div class="pair-row">
-          <input type="text" id="pair-code-input" placeholder="Enter 3–8 character code" maxlength="12" autocapitalize="off" autocorrect="off" />
-          <button class="btn-setting btn-primary-inline" data-act="pair-apply">Apply Code</button>
-        </div>
-        <div id="pair-status" class="pair-status"></div>
-      </div>
-
-      <div class="settings-section">
-        <h3>About</h3>
-        <div class="info-row"><span class="label">App</span><span class="value">MyWolf TV Player</span></div>
-        <div class="info-row"><span class="label">Version</span><span class="value">1.1.0</span></div>
-        <div class="info-row"><span class="label">Website</span><span class="value"><a href="https://mywolftv.com" target="_blank" rel="noopener">mywolftv.com</a></span></div>
+      <div class="st-footer">
+        <div><strong>Playlist:</strong> ${escapeHtml(active.name)} &nbsp;•&nbsp; <strong>Expires:</strong> ${escapeHtml(expiry)}</div>
+        <div><strong>Device ID:</strong> ${escapeHtml(did)}</div>
+        <div><strong>App:</strong> MyWolf TV Player v1.2 &nbsp;•&nbsp; <a href="https://mywolftv.com" target="_blank" rel="noopener">mywolftv.com</a></div>
       </div>
     `;
-
     itemsGrid.appendChild(wrap);
-
-    function bind(id, key, transform) {
-      const el = document.getElementById(id);
-      if (!el) return;
-      const evt = el.type === 'checkbox' ? 'change' : (el.tagName === 'SELECT' ? 'change' : 'input');
-      el.addEventListener(evt, () => {
-        const st = MWStorage.getSettings();
-        const v = el.type === 'checkbox' ? el.checked : el.value;
-        st[key] = transform ? transform(v) : v;
-        MWStorage.saveSettings(st);
-      });
-    }
-    bind('setting-autoplay', 'autoplay');
-    bind('setting-logos', 'showLogos');
-    bind('setting-aspect', 'aspect');
-    bind('setting-stream', 'streamFormat');
-    bind('setting-buffer', 'bufferLen', Number);
-    bind('setting-time', 'timeFormat');
-    bind('setting-pin', 'pin', v => String(v).replace(/\D/g, '').slice(0, 4));
-
     wrap.querySelectorAll('[data-act]').forEach(btn => {
-      btn.addEventListener('click', () => handleSettingAction(btn.dataset.act, btn.dataset.kind));
+      btn.addEventListener('click', () => handleSettingTile(btn.dataset.act));
     });
   }
 
-  function handleSettingAction(act, kind) {
-    if (act === 'clear-hist') {
-      const label = kind ? kind : 'all';
-      if (!confirm('Clear ' + label + ' history?')) return;
-      MWStorage.clearHistory(active.id, kind || null);
-      showToast('History cleared', 'success');
+  function handleSettingTile(act) {
+    const s = MWStorage.getSettings();
+    switch (act) {
+      case 'switch':
+        window.location.href = 'index.html?choose=1';
+        return;
+      case 'pin':
+        promptPinChange();
+        return;
+      case 'pinoff':
+        s.pin = '';
+        MWStorage.saveSettings(s);
+        state.pinUnlocked = false;
+        showToast('Parental control disabled', 'success');
+        renderSettings();
+        return;
+      case 'language':
+        showToast('Only English is supported in this version', 'success');
+        return;
+      case 'layout':
+        showToast('Layout customization coming soon', 'success');
+        return;
+      case 'logos':
+        s.showLogos = s.showLogos === false;
+        MWStorage.saveSettings(s);
+        showToast('Channel logos ' + (s.showLogos ? 'on' : 'off'), 'success');
+        renderSettings();
+        return;
+      case 'clear-hist-l':
+      case 'clear-hist-m':
+      case 'clear-hist-s': {
+        const k = act === 'clear-hist-l' ? 'live' : act === 'clear-hist-m' ? 'movies' : 'series';
+        if (!confirm('Clear ' + k + ' history?')) return;
+        MWStorage.clearHistory(active.id, k);
+        showToast(k.charAt(0).toUpperCase() + k.slice(1) + ' history cleared', 'success');
+        return;
+      }
+      case 'sort': {
+        const order = ['Default', 'A-Z', 'Z-A', 'Recently Added'];
+        const cur = order.indexOf(s.sortChannels || 'Default');
+        s.sortChannels = order[(cur + 1) % order.length];
+        MWStorage.saveSettings(s);
+        renderSettings();
+        return;
+      }
+      case 'stream': {
+        const order = ['auto', 'm3u8', 'ts'];
+        const cur = order.indexOf(s.streamFormat || 'auto');
+        s.streamFormat = order[(cur + 1) % order.length];
+        MWStorage.saveSettings(s);
+        renderSettings();
+        return;
+      }
+      case 'extplayer':
+        openExternalPlayerDialog();
+        return;
+      case 'aspect': {
+        const order = ['contain', 'fill', 'cover', 'zoom'];
+        const cur = order.indexOf(s.aspect || 'contain');
+        s.aspect = order[(cur + 1) % order.length];
+        MWStorage.saveSettings(s);
+        renderSettings();
+        return;
+      }
+      case 'buffer': {
+        const order = [10, 30, 60, 90];
+        const cur = order.indexOf(Number(s.bufferLen || 30));
+        s.bufferLen = order[(cur + 1) % order.length];
+        MWStorage.saveSettings(s);
+        renderSettings();
+        return;
+      }
+      case 'time':
+        s.timeFormat = (s.timeFormat || '24h') === '24h' ? '12h' : '24h';
+        MWStorage.saveSettings(s);
+        tickClock();
+        renderSettings();
+        return;
+      case 'subs':
+        showToast('Subtitles are controlled from the player menu', 'success');
+        return;
+      case 'device':
+        alert('Device ID:\n' + MWStorage.getDeviceId());
+        return;
+      case 'refresh':
+        state.categories = { live: [], movies: [], series: [] };
+        state.cache = { live: {}, movies: {}, series: {} };
+        showToast('Cache cleared. Reloading...', 'success');
+        setTimeout(() => switchView('live'), 300);
+        return;
+      case 'reset-all':
+        if (!confirm('Erase ALL data (playlists, favorites, history, settings)?')) return;
+        MWStorage.clearAll();
+        window.location.href = 'index.html?choose=1';
+        return;
+    }
+  }
+
+  function promptPinChange() {
+    const cur = (MWStorage.getSettings().pin || '');
+    const pin = prompt('Enter 4-digit PIN to lock adult categories (blank = off):', cur);
+    if (pin === null) return;
+    const s = MWStorage.getSettings();
+    s.pin = String(pin).replace(/\D/g, '').slice(0, 4);
+    MWStorage.saveSettings(s);
+    state.pinUnlocked = !s.pin;
+    showToast(s.pin ? 'PIN set' : 'PIN cleared', 'success');
+    renderSettings();
+  }
+
+  function openExternalPlayerDialog() {
+    const cur = MWStorage.getSettings().externalPlayer || 'default';
+    const overlay = document.createElement('div');
+    overlay.className = 'ext-overlay';
+    overlay.innerHTML = `
+      <div class="ext-dialog" role="dialog">
+        <h3>External Players</h3>
+        <p class="ext-desc">Open Live TV, Movies and Series in another app.</p>
+        <label class="ext-opt"><input type="radio" name="extp" value="default" ${cur==='default'?'checked':''}><span>Default (built-in)</span></label>
+        <label class="ext-opt"><input type="radio" name="extp" value="vlc" ${cur==='vlc'?'checked':''}><span>VLC Player</span></label>
+        <label class="ext-opt"><input type="radio" name="extp" value="mx" ${cur==='mx'?'checked':''}><span>MX Player</span></label>
+        <div class="ext-actions">
+          <button class="ext-cancel">Cancel</button>
+          <button class="ext-ok">OK</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector('.ext-cancel').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('.ext-ok').addEventListener('click', () => {
+      const picked = overlay.querySelector('input[name="extp"]:checked');
+      const v = picked ? picked.value : 'default';
+      const st = MWStorage.getSettings();
+      st.externalPlayer = v;
+      MWStorage.saveSettings(st);
+      close();
       renderSettings();
-    } else if (act === 'clear-fav') {
-      const label = kind ? kind : 'all';
-      if (!confirm('Clear ' + label + ' favorites?')) return;
-      MWStorage.clearFavorites(active.id, kind || null);
-      showToast('Favorites cleared', 'success');
-      renderSettings();
-    } else if (act === 'switch') {
-      window.location.href = 'index.html?choose=1';
-    } else if (act === 'refresh') {
-      state.categories = { live: [], movies: [], series: [] };
-      state.cache = { live: {}, movies: {}, series: {} };
-      showToast('Cache cleared. Reloading...', 'success');
-      setTimeout(() => switchView('live'), 400);
-    } else if (act === 'clear-resume') {
-      if (!confirm('Clear all saved resume positions?')) return;
-      MWStorage.clearAllResume();
-      showToast('Resume positions cleared', 'success');
-    } else if (act === 'remove-active') {
-      if (!confirm('Remove this playlist from the device?')) return;
-      MWStorage.removePlaylist(active.id);
-      window.location.href = 'index.html?choose=1';
-    } else if (act === 'reset-all') {
-      if (!confirm('Erase ALL data (playlists, favorites, history, settings)?')) return;
-      MWStorage.clearAll();
-      window.location.href = 'index.html?choose=1';
-    } else if (act === 'pair-apply') {
-      applyPairCode();
+      showToast('External player: ' + (v === 'default' ? 'Default' : v === 'vlc' ? 'VLC' : 'MX Player'), 'success');
+    });
+    const focusTarget = overlay.querySelector('input[name="extp"]:checked') || overlay.querySelector('input[name="extp"]');
+    if (focusTarget) focusTarget.focus();
+  }
+
+  function openExternal(url, title) {
+    const ext = MWStorage.getSettings().externalPlayer || 'default';
+    if (ext === 'default' || !url) return false;
+    const pkg = ext === 'vlc' ? 'org.videolan.vlc' : 'com.mxtech.videoplayer.ad';
+    const intent = 'intent:' + url + '#Intent;package=' + pkg + ';type=video/*;S.title=' + encodeURIComponent(title || '') + ';end';
+    try {
+      window.location.href = intent;
+      showToast('Opening in ' + (ext === 'vlc' ? 'VLC' : 'MX Player') + '…', 'success');
+      return true;
+    } catch (e) {
+      showToast('Failed to open external player', 'error');
+      return false;
     }
   }
 
@@ -1016,6 +1098,8 @@
   // ========== Recent / History ==========
   async function renderRecent() {
     categoryList.style.display = '';
+    if (categoryList.parentElement) categoryList.parentElement.style.display = '';
+    if (channelCol) channelCol.hidden = true;
     categoryList.innerHTML = '';
     const hist = MWStorage.getHistory(active.id);
 
@@ -1083,5 +1167,5 @@
   // (handled above)
 
   // ========== Boot ==========
-  switchView('live');
+  showHub();
 })();

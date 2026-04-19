@@ -1,24 +1,26 @@
 :root {
-  --bg-0: #070912;
-  --bg-1: #0d1124;
-  --bg-2: #141a33;
-  --bg-3: #1b2245;
-  --border: #232b52;
-  --text: #e6e9f5;
-  --text-dim: #8d93b5;
-  --text-mute: #5f6690;
-  --primary: #7c5cff;
-  --primary-2: #22d3ee;
+  --bg-0: #0a0816;
+  --bg-1: #140f28;
+  --bg-2: #1c1638;
+  --bg-3: #2a1f4a;
+  --border: #3a2a5c;
+  --text: #f3eefc;
+  --text-dim: #b3a8cc;
+  --text-mute: #7e7298;
+  --primary: #e8255f;
+  --primary-2: #ff4d7a;
   --accent: #ff4d7a;
   --success: #22c55e;
   --warn: #f59e0b;
   --danger: #ef4444;
-  --shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
   --radius: 14px;
   --radius-sm: 8px;
   --radius-lg: 20px;
-  --grad: linear-gradient(135deg, #7c5cff 0%, #22d3ee 100%);
-  --grad-soft: linear-gradient(135deg, rgba(124, 92, 255, 0.15), rgba(34, 211, 238, 0.15));
+  --grad: linear-gradient(135deg, #ff2e63 0%, #c4163f 100%);
+  --grad-tile: linear-gradient(135deg, #ff3060 0%, #b21340 100%);
+  --grad-soft: linear-gradient(135deg, rgba(255, 46, 99, 0.18), rgba(196, 22, 63, 0.18));
+  --grad-bg: linear-gradient(160deg, #2a1b4a 0%, #1a0f2e 40%, #3a1440 100%);
 }
 
 * {

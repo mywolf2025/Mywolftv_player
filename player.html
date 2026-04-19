@@ -31,7 +31,53 @@
   </script>
   <script src="js/vendor/hls.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js';document.head.appendChild(s);"></script>
 </head>
-<body class="app-body">
+<body class="app-body hub-mode">
+  <section id="hub" class="hub">
+    <div class="hub-top">
+      <div class="clock" id="hub-clock"></div>
+      <div class="hub-expiry" id="hub-expiry"></div>
+    </div>
+    <div class="hub-brand">
+      <img src="assets/logo.svg" alt="MyWolf TV" />
+      <h1>MyWolf <span>TV</span></h1>
+      <p id="hub-playlist-name">Playlist</p>
+    </div>
+    <div class="hub-grid">
+      <button class="hub-tile tile-live" data-hub="live" tabindex="0">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7v2H7v2h10v-2h-3v-2h7a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18v12z"/></svg>
+        <span>Live TV</span>
+      </button>
+      <button class="hub-tile" data-hub="movies" tabindex="0">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 4v1h-2V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v1H6V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v16a2 2 0 0 0 2 2 2 2 0 0 0 2-2v-1h2v1a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-1h2v1a2 2 0 0 0 2 2 2 2 0 0 0 2-2V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2z"/></svg>
+        <span>Movies</span>
+      </button>
+      <button class="hub-tile" data-hub="series" tabindex="0">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-2 .89-2 2v11c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>
+        <span>Series</span>
+      </button>
+      <button class="hub-tile" data-hub="settings" tabindex="0">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        <span>Settings</span>
+      </button>
+      <button class="hub-tile" data-hub="favorites" tabindex="0">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        <span>Favorites</span>
+      </button>
+      <button class="hub-tile" data-hub="reload" tabindex="0">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+        <span>Reload</span>
+      </button>
+      <button class="hub-tile tile-ghost" data-hub="switch" tabindex="0">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+        <span>Change Playlist</span>
+      </button>
+      <button class="hub-tile tile-ghost" data-hub="exit" tabindex="0">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+        <span>Exit</span>
+      </button>
+    </div>
+  </section>
+
   <aside class="sidebar">
     <div class="sidebar-brand">
       <img src="assets/logo.svg" alt="MyWolf TV" />
@@ -82,18 +128,25 @@
 
   <main class="main">
     <header class="topbar">
+      <button id="back-hub" class="back-hub-btn" title="Home">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 19v-5h4v5c0 .55.45 1 1 1h3c.55 0 1-.45 1-1v-7h1.7c.46 0 .68-.57.33-.87L12.67 3.6c-.38-.34-.96-.34-1.34 0l-8.36 7.53c-.34.3-.13.87.33.87H5v7c0 .55.45 1 1 1h3c.55 0 1-.45 1-1z"/></svg>
+        <span>Home</span>
+      </button>
       <div class="topbar-title" id="view-title">Live TV</div>
       <div class="topbar-actions">
         <input type="search" id="category-search" placeholder="Filter channels..." class="topbar-search" />
+        <div class="topbar-expiry" id="topbar-expiry"></div>
         <div class="clock" id="clock"></div>
       </div>
     </header>
 
-    <div class="content">
+    <div class="content" id="content">
       <aside class="categories" id="categories">
         <div class="category-header">Categories</div>
         <div class="category-list" id="category-list"></div>
       </aside>
+
+      <aside class="channel-col" id="channel-col" hidden></aside>
 
       <section class="items-panel" id="items-panel">
         <div class="items-grid" id="items-grid"></div>
