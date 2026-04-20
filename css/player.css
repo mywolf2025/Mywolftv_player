@@ -808,6 +808,8 @@
 
 /* ===== 3-column Live TV ===== */
 .content.live-layout { grid-template-columns: 230px 360px 1fr; }
+.content.live-layout .items-panel { display: none; }
+.preview-col[hidden] { display: none; }
 .channel-col {
   border-right: 1px solid var(--border);
   background: var(--bg-1);
@@ -1119,3 +1121,14 @@
   box-shadow: 0 6px 16px rgba(232, 37, 95, 0.35);
 }
 .ext-ok:hover { transform: translateY(-1px); }
+
+/* Virtual sidebar rows (Resume to Watch / Favorites) */
+.category-item.virtual {
+  font-weight: 700;
+  color: var(--primary-2);
+  border-bottom: 1px solid var(--border);
+}
+.category-item.virtual.active {
+  background: var(--grad-soft);
+  color: var(--text);
+}

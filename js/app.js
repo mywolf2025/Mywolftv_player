@@ -55,6 +55,14 @@
   const backHubBtn = $('#back-hub');
   const appBody = document.body;
   const channelCol = $('#channel-col');
+  const previewCol = $('#preview-col');
+  const previewHeader = $('#preview-header');
+  const previewBody = $('#preview-body');
+  const previewLogo = $('#preview-logo');
+  const previewName = $('#preview-name');
+  const previewEpg = $('#preview-epg');
+  const previewPlayBtn = $('#preview-play');
+  const previewFavBtn = $('#preview-fav');
   const content = $('#content');
 
   playlistName.textContent = active.name;
@@ -191,6 +199,7 @@
 
     categoryList.style.display = '';
     if (categoryList.parentElement) categoryList.parentElement.style.display = '';
+    if (view !== 'live') setLive3ColActive(false);
     setLoading('Loading ' + view + '...');
 
     try {
@@ -230,6 +239,32 @@
   async function loadCategoryItems(view, categoryId) {
     setLoading('Loading...');
     let items;
+
+    // Virtual sidebar sections
+    if (categoryId === '__resume') {
+      const entries = MWStorage.getHistory(active.id)[view] || [];
+      items = entries.map(e => view === 'series'
+        ? { series_id: e.id, name: e.name, cover: e.logo }
+        : { stream_id: e.id, name: e.name, stream_icon: e.logo });
+      renderItems(view, items);
+      return;
+    }
+    if (categoryId === '__fav') {
+      const favIds = (MWStorage.getFavorites(active.id)[view] || []).map(String);
+      if (!favIds.length) { renderItems(view, []); return; }
+      if (!state.cache[view]['*']) {
+        if (view === 'live') items = await client.getLiveStreams();
+        else if (view === 'movies') items = await client.getVodStreams();
+        else if (view === 'series') items = await client.getSeries();
+        state.cache[view]['*'] = Array.isArray(items) ? items : [];
+      }
+      const all = state.cache[view]['*'];
+      const favSet = new Set(favIds);
+      items = all.filter(it => favSet.has(String(it.stream_id || it.series_id || it.id)));
+      renderItems(view, items);
+      return;
+    }
+
     if (categoryId === '*') {
       if (!state.cache[view]['*']) {
         if (view === 'live') items = await client.getLiveStreams();
@@ -293,6 +328,28 @@
     const selected = state.selectedCategory[view];
 
     categoryList.innerHTML = '';
+
+    // Virtual sections (IBO-style sidebar)
+    const virtuals = [];
+    const histAll = MWStorage.getHistory(active.id);
+    const favAll = MWStorage.getFavorites(active.id);
+    if (view === 'movies' || view === 'series') {
+      virtuals.push({ id: '__resume', name: 'Resume to Watch', count: (histAll[view] || []).length });
+    }
+    virtuals.push({ id: '__fav', name: 'Favorites', count: (favAll[view] || []).length });
+
+    virtuals.forEach(v => {
+      const el = document.createElement('div');
+      el.className = 'category-item virtual' + (selected === v.id ? ' active' : '');
+      el.innerHTML = `<span>${escapeHtml(v.name)}</span><span class="category-count">${v.count}</span>`;
+      el.addEventListener('click', () => {
+        state.selectedCategory[view] = v.id;
+        state.userPickedCategory[view] = true;
+        loadView(view);
+      });
+      categoryList.appendChild(el);
+    });
+
     const all = document.createElement('div');
     all.className = 'category-item' + (selected === '*' ? ' active' : '');
     all.innerHTML = `<span>All</span>`;
@@ -338,27 +395,113 @@
 
   const PAGE_SIZE = 36;
 
+  function setLive3ColActive(on) {
+    if (channelCol) channelCol.hidden = !on;
+    if (previewCol) previewCol.hidden = !on;
+    if (content) content.classList.toggle('live-layout', !!on);
+  }
+
   function renderItems(view, items) {
     clearLoading();
     itemsGrid.className = 'items-grid';
 
     const filter = state.filter.toLowerCase();
-    const filtered = filter
+    let filtered = filter
       ? items.filter(it => {
           const n = (it.name || it.title || '').toLowerCase();
           return n.includes(filter);
         })
       : items;
 
+    if (view === 'live') {
+      const sort = MWStorage.getSettings().sortChannels || 'Default';
+      if (sort === 'A-Z') filtered = [...filtered].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      else if (sort === 'Z-A') filtered = [...filtered].sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+    }
+
     if (!filtered.length) {
+      setLive3ColActive(false);
       emptyState.hidden = false;
       emptyState.querySelector('p').textContent = 'No items found';
       return;
     }
 
+    if (view === 'live') {
+      renderLiveList(filtered);
+      return;
+    }
+
+    setLive3ColActive(false);
     state.renderCtx = { view, filtered, offset: 0 };
     itemsGrid.innerHTML = '';
     appendPage();
+  }
+
+  function renderLiveList(items) {
+    setLive3ColActive(true);
+    emptyState.hidden = true;
+
+    const showLogos = MWStorage.getSettings().showLogos !== false;
+    const frag = document.createDocumentFragment();
+    items.forEach((it, i) => {
+      const row = document.createElement('div');
+      row.className = 'channel-row';
+      row.setAttribute('tabindex', '0');
+      const num = String(it.num || (i + 1));
+      const logo = showLogos ? (it.stream_icon || it.logo || '') : '';
+      const icon = logo
+        ? `<img class="ch-ic" src="${escapeHtml(logo)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />`
+        : `<div class="ch-ic"></div>`;
+      row.innerHTML = `<div class="ch-num">${escapeHtml(num)}</div>${icon}<div class="ch-name">${escapeHtml(it.name || 'Channel')}</div>`;
+      const sel = () => selectLiveChannel(it, row);
+      row.addEventListener('click', sel);
+      row.addEventListener('focus', sel);
+      row.addEventListener('dblclick', () => openItem('live', it));
+      row.addEventListener('keydown', (e) => { if (e.key === 'Enter') openItem('live', it); });
+      frag.appendChild(row);
+    });
+    channelCol.innerHTML = '';
+    channelCol.appendChild(frag);
+
+    const first = channelCol.querySelector('.channel-row');
+    if (first) {
+      first.classList.add('active');
+      selectLiveChannel(items[0], first);
+    }
+  }
+
+  function selectLiveChannel(item, rowEl) {
+    if (rowEl) {
+      channelCol.querySelectorAll('.channel-row.active').forEach(r => r.classList.remove('active'));
+      rowEl.classList.add('active');
+    }
+    const logo = item.stream_icon || item.logo || '';
+    const id = String(item.stream_id || item.id);
+    previewName.textContent = item.name || 'Channel';
+    if (logo) { previewLogo.src = logo; previewLogo.style.display = ''; }
+    else { previewLogo.style.display = 'none'; }
+    previewBody.style.backgroundImage = logo
+      ? `linear-gradient(180deg, rgba(20,15,40,0.25), rgba(20,15,40,0.88)), url(${JSON.stringify(logo)})`
+      : '';
+    previewEpg.textContent = '';
+
+    previewPlayBtn.onclick = () => openItem('live', item);
+    const isFav = MWStorage.isFavorite(active.id, 'live', id);
+    previewFavBtn.textContent = isFav ? 'Remove Favorite' : 'Favorite';
+    previewFavBtn.onclick = () => {
+      const added = MWStorage.toggleFavorite(active.id, 'live', id);
+      previewFavBtn.textContent = added ? 'Remove Favorite' : 'Favorite';
+    };
+
+    if (active.type === 'xtream' && item.stream_id) {
+      client.getShortEPG(item.stream_id, 3).then(data => {
+        const list = (data && data.epg_listings) || [];
+        if (!list.length) return;
+        const now = Date.now() / 1000;
+        const cur = list.find(ev => now >= Number(ev.start_timestamp) && now < Number(ev.stop_timestamp));
+        if (cur) previewEpg.textContent = 'Now: ' + decodeB64(cur.title);
+      }).catch(() => {});
+    }
   }
 
   function appendPage() {
@@ -673,7 +816,7 @@
   function renderSearch() {
     categoryList.style.display = '';
     if (categoryList.parentElement) categoryList.parentElement.style.display = '';
-    if (channelCol) channelCol.hidden = true;
+    setLive3ColActive(false);
     categoryList.innerHTML = `
       <div class="category-item active">All content</div>
     `;
@@ -785,7 +928,7 @@
   async function renderFavorites() {
     categoryList.style.display = '';
     if (categoryList.parentElement) categoryList.parentElement.style.display = '';
-    if (channelCol) channelCol.hidden = true;
+    setLive3ColActive(false);
     categoryList.innerHTML = '';
     ['live', 'movies', 'series'].forEach(kind => {
       const count = (MWStorage.getFavorites(active.id)[kind] || []).length;
@@ -835,7 +978,7 @@
   // ========== Settings (tile grid) ==========
   function renderSettings() {
     if (categoryList.parentElement) categoryList.parentElement.style.display = 'none';
-    if (channelCol) channelCol.hidden = true;
+    setLive3ColActive(false);
     itemsGrid.className = 'items-grid list';
     itemsGrid.innerHTML = '';
     emptyState.hidden = true;
@@ -1099,7 +1242,7 @@
   async function renderRecent() {
     categoryList.style.display = '';
     if (categoryList.parentElement) categoryList.parentElement.style.display = '';
-    if (channelCol) channelCol.hidden = true;
+    setLive3ColActive(false);
     categoryList.innerHTML = '';
     const hist = MWStorage.getHistory(active.id);
 

@@ -148,6 +148,19 @@
 
       <aside class="channel-col" id="channel-col" hidden></aside>
 
+      <section class="preview-col" id="preview-col" hidden>
+        <div class="preview-header" id="preview-header">Now Selected</div>
+        <div class="preview-body" id="preview-body">
+          <img id="preview-logo" class="preview-logo" alt="" onerror="this.style.display='none'" />
+          <div class="preview-name" id="preview-name">Select a channel</div>
+          <div class="preview-epg" id="preview-epg"></div>
+          <div class="preview-actions">
+            <button class="pa-btn" id="preview-play" tabindex="0">Play</button>
+            <button class="pa-btn" id="preview-fav" tabindex="0">Favorite</button>
+          </div>
+        </div>
+      </section>
+
       <section class="items-panel" id="items-panel">
         <div class="items-grid" id="items-grid"></div>
         <div class="empty-state" id="empty-state" hidden>
